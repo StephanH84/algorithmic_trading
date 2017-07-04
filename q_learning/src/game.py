@@ -65,7 +65,7 @@ class TicTacToe():
         if status == self.StateResult.WIN:
             return 1
         elif status == self.StateResult.LOSS:
-            return -20
+            return -20 # very large negative reward to make to make it dislike losing
         elif status == self.StateResult.UNDEFINED:
             return 0
         elif status == self.StateResult.DRAW:
@@ -125,3 +125,40 @@ class Player():
     A = 1
     B = -1
     EMPTY = 0
+
+
+class RunRL():
+    def __init__(self, game, agentA, agentB):
+        self.game = game
+        self.agentA = agentA
+        self.agentB = agentB
+
+    def run(self, N=10000000, episodes=30000):
+
+        game_counter = 0
+        for n in range(N):
+            if n % 2 == 0:
+                player = Player.A
+                action = self.agentA.turn(self.game.state)
+            else:
+                player = Player.B
+                action = self.agentB.turn(self.game.state)
+
+            if action != None:
+                new_state, reward, state = self.game.move(player, action)
+
+                if game_counter > episodes:
+                    self.game.output()
+                    print(str(state) + "\n")
+
+                if n % 2 == 0:
+                    self.agentA.update(reward, new_state)
+                else:
+                    self.agentB.update(-reward, new_state)  # factor -1, since reward is seen from A's point of view
+            else:
+                assert True
+                state = self.game.StateResult.DRAW
+
+            if state in [self.game.StateResult.WIN, self.game.StateResult.LOSS, self.game.StateResult.DRAW]:
+                game_counter += 1
+                self.game.reset()
