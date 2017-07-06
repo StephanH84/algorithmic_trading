@@ -5,10 +5,10 @@ import random
 
 class DQN():
     def __init__(self, state_is_terminal):
-        self.network = Network(state_is_terminal)
         self.replay_memory = []
         self.history = []
-        self.step_size = 4
+        self.step_size = 3
+        self.network = Network(state_is_terminal, self.step_size)
         self.N = 10
 
     def get_action(self, state):

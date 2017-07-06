@@ -20,10 +20,11 @@ def actions_to_matrix(action):
     return matrix
 
 class Network():
-    def __init__(self, state_is_terminal):
+    def __init__(self, state_is_terminal, step_size):
         self.state_is_terminal = state_is_terminal
         self.theta = None
         self.theta_ = None
+        self.step_size = step_size
         self.initialize()
 
     def __del__(self):
@@ -38,7 +39,7 @@ class Network():
         self.actions = tf.placeholder(tf.float32, shape=[None, 3, 3])
 
         # state_seq
-        self.phi = tf.placeholder(tf.float32, shape=[None, 3, 3, 4])
+        self.phi = tf.placeholder(tf.float32, shape=[None, 3, 3, self.step_size])
         self.output = self.define_network(self.phi)
 
         output_evaluated = tf.reduce_sum(self.output * self.actions, axis=[1, 2])
@@ -59,7 +60,7 @@ class Network():
 
 
     def define_network(self, phi):
-        self.W_conv1 = weight_variable([3, 3, 4, 16])
+        self.W_conv1 = weight_variable([3, 3, self.step_size, 16])
         self.b_conv1 = bias_variable([3, 3, 16])
         h_conv1 = tf.nn.relu(conv2d(phi, self.W_conv1) + self.b_conv1)
 
