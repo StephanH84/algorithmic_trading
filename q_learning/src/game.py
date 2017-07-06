@@ -72,6 +72,9 @@ class TicTacToe():
             return 0
 
     def check_state(self):
+        return self.check_state_g(self.state)
+
+    def check_state_g(self, state):
         # check if draw (full), win or loss or undefined at all for A
 
         for value in [Player.A, Player.B]:
@@ -115,6 +118,9 @@ class TicTacToe():
     def is_valid_action(state, action):
         x, y = action
         return state[x, y] == Player.EMPTY
+
+    def state_is_terminal(self, state):
+        return self.check_state_g(state) in [self.StateResult.WIN, self.StateResult.LOSS, self.StateResult.DRAW]
 
 
 class IllegalMoveException(Exception):
@@ -162,3 +168,5 @@ class RunRL():
             if state in [self.game.StateResult.WIN, self.game.StateResult.LOSS, self.game.StateResult.DRAW]:
                 game_counter += 1
                 self.game.reset()
+                self.agentA.reset_history()
+                self.agentB.reset_history()

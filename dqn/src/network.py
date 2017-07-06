@@ -20,10 +20,10 @@ def actions_to_matrix(action):
     return matrix
 
 class Network():
-    def __init__(self, state_is_terminal, step_size):
+    def __init__(self, state_is_terminal, step_size, alpha, gamma):
         self.state_is_terminal = state_is_terminal
-        self.theta = None
-        self.theta_ = None
+        self.alpha = alpha
+        self.gamma = gamma
         self.step_size = step_size
         self.initialize()
 
@@ -45,7 +45,7 @@ class Network():
         output_evaluated = tf.reduce_sum(self.output * self.actions, axis=[1, 2])
         self.loss = tf.reduce_sum(tf.squared_difference(self.y, output_evaluated))
 
-        self.train_step = tf.train.AdamOptimizer(1e-4).minimize(self.loss)
+        self.train_step = tf.train.AdamOptimizer(self.alpha).minimize(self.loss)
 
         self.output_action = tf.argmax(tf.reshape(self.output, [-1, 9])[0])
         action_ = tf.argmax(tf.reshape(self.actions, [-1, 9])[0])
@@ -100,8 +100,9 @@ class Network():
             for episode in range(3):
                 batch_dict = {self.y: y_, self.phi: phi_, self.actions: actions_}
                 self.train_step.run(feed_dict=batch_dict)
-                train_accuracy = self.accuracy.eval(feed_dict=batch_dict)
-                print('train accuracy %g' % train_accuracy)
+                #train_accuracy = self.accuracy.eval(feed_dict=batch_dict)
+                #train_loss = self.loss.eval(feed_dict=batch_dict)
+                #print('train accuracy %g, train loss %g' % (train_accuracy, train_loss))
 
     def learn(self, minibatch):
         self.round_counter += 1
@@ -111,11 +112,11 @@ class Network():
         actions = []
         phi = []
         for batch in minibatch:
-            if self.state_is_terminal(batch[3]):
+            if self.state_is_terminal(batch[3][-1]):
                 value = batch[2]
             else:
 
-                feed_dict = {self.phi: batch[3],
+                feed_dict = {self.phi: np.asarray([batch[3]]).tolist(),
                              self.W_conv1: self.W_conv1_saved,
                              self.b_conv1: self.b_conv1_saved,
                              self.W_conv2: self.W_conv2_saved,
@@ -124,7 +125,7 @@ class Network():
                              self.b: self.b_saved}
 
                 output_value = self.sess.run(self.output, feed_dict=feed_dict)
-                max_value = tf.reduce_max(output_value)
+                max_value = np.max(output_value)
                 value = batch[2] + self.gamma * max_value
             y.append(value)
             actions.append(actions_to_matrix(batch[1]))

@@ -7,7 +7,7 @@ class Agent():
         self.game = game
         self.alpha = alpha
         self.gamma = gamma
-        self.dqn = DQN(self.game.is_valid_action)
+        self.dqn = DQN(self.game.state_is_terminal, self.alpha, self.gamma)
 
     def turn(self, state):
         self.previous_state = state
@@ -33,6 +33,9 @@ class Agent():
                 x = int(action_value / 3)
                 a = [x, y]
 
+                if not self.game.__class__.is_valid_action(state, a): # TODO: Probably not well adjusted; better to check the second or third best before
+                    a = self.explore(state)
+
         return a
 
     def explore(self, state):
@@ -47,3 +50,5 @@ class Agent():
         self.dqn.store(self.action, reward, new_state)
         self.dqn.learn()
 
+    def reset_history(self):
+        self.dqn.reset_history()
