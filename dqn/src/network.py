@@ -1,6 +1,5 @@
 # TODO: Implement deep neural network (and resp. interface) for Q-function approximation
 import tensorflow as tf
-import numpy as np
 
 def weight_variable(shape):
   initial = tf.truncated_normal(shape, stddev=0.1)
@@ -21,7 +20,14 @@ class Network():
         self.theta_ = None
         self.initialize()
 
+    def __del__(self):
+        if self.sess is not None:
+            self.sess.close()
+
     def initialize(self):
+        self.round_counter = 0
+        self.C = 20
+
         self.y = tf.placeholder(tf.float32, shape=[None])
         self.actions = tf.placeholder(tf.float32, shape=[None, 3, 3])
 
@@ -42,20 +48,24 @@ class Network():
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
 
-    def define_network(self, phi):
-        W_conv1 = weight_variable([3, 3, 4, 16])
-        b_conv1 = bias_variable([3, 3, 16])
-        h_conv1 = tf.nn.relu(conv2d(phi, W_conv1) + b_conv1)
+        # save value of weights.
+        self.save_weights()
 
-        W_conv2 = weight_variable([3, 3, 16, 32])
-        b_conv2 = bias_variable([3, 3, 32])
-        h_conv2 = tf.nn.relu(conv2d(h_conv1, W_conv2) + b_conv2)
+
+    def define_network(self, phi):
+        self.W_conv1 = weight_variable([3, 3, 4, 16])
+        self.b_conv1 = bias_variable([3, 3, 16])
+        h_conv1 = tf.nn.relu(conv2d(phi, self.W_conv1) + self.b_conv1)
+
+        self.W_conv2 = weight_variable([3, 3, 16, 32])
+        self.b_conv2 = bias_variable([3, 3, 32])
+        h_conv2 = tf.nn.relu(conv2d(h_conv1, self.W_conv2) + self.b_conv2)
 
         h_conv2_reshaped = tf.reshape(h_conv2, [-1, 3 * 3 * 32])
-        W_fcn = tf.Variable(tf.zeros([3 * 3 * 32, 9]))
-        b = tf.Variable(tf.zeros([9]))
+        self.W_fcn = tf.Variable(tf.zeros([3 * 3 * 32, 9]))
+        self.b = tf.Variable(tf.zeros([9]))
 
-        y = tf.matmul(h_conv2_reshaped, W_fcn) + b
+        y = tf.matmul(h_conv2_reshaped, self.W_fcn) + self.b
 
         output_ = tf.nn.softmax(y)
 
@@ -63,27 +73,56 @@ class Network():
 
         return output
 
+    def save_weights(self):
+        self.W_conv1_saved = self.sess.run(self.W_conv1)
+        self.b_conv1_saved = self.sess.run(self.b_conv1)
+        self.W_conv2_saved = self.sess.run(self.W_conv2)
+        self.b_conv2_saved = self.sess.run(self.b_conv2)
+        self.W_fcn_saved = self.sess.run(self.W_fcn)
+        self.b_saved = self.sess.run(self.b)
 
-    def evaluate(self, phi, theta_mode=0):
-        # returns the likelihood for the recommended actions
-        result = self.sess.run(self.output, feed_dict={self.phi: phi})
+    def evaluate(self, phi):
+        # returns the argmax action for given phi
+        action_value = self.sess.run(self.output_action, feed_dict={self.phi: phi})
+        return action_value
 
-    def learn(self, batch):
+    def perform_sgd(self, y_, phi_, actions_):
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
             for episode in range(3):
-                batch_dict = {self.y: batch[0], self.phi: batch[1], self.actions: batch[2]}
+                batch_dict = {self.y: y_, self.phi: phi_, self.actions: actions_}
                 self.train_step.run(feed_dict=batch_dict)
                 train_accuracy = self.accuracy.eval(feed_dict=batch_dict)
                 print('train accuracy %g' % train_accuracy)
 
-    def perform_sgd(self, minibatch):
-        # calculate output vector:
+    def learn(self, minibatch):
+        self.round_counter += 1
+
+        # calculate output vector for stored weights (see save_weights):
         y = []
+        actions = []
+        phi = []
         for batch in minibatch:
             if self.state_is_terminal(batch[3]):
                 value = batch[2]
             else:
-                argmax_q = 0 # TODO
-                value = batch[2] + self.gamma * argmax_q
+
+                feed_dict = {self.phi: batch[3],
+                             self.W_conv1: self.W_conv1_saved,
+                             self.b_conv1: self.b_conv1_saved,
+                             self.W_conv2: self.W_conv2_saved,
+                             self.b_conv2: self.b_conv2_saved,
+                             self.W_fcn: self.W_fcn_saved,
+                             self.b: self.b_saved}
+
+                output_value = self.sess.run(self.output, feed_dict=feed_dict)
+                max_value = tf.reduce_max(output_value)
+                value = batch[2] + self.gamma * max_value
             y.append(value)
+            actions.append(batch[1])
+            phi.append(batch[0])
+
+        self.perform_sgd(y, phi, actions)
+
+        if self.round_counter % self.C == 0:
+            self.save_weights()

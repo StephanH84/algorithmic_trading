@@ -1,12 +1,13 @@
 # TODO: Implement similar agent as for q_learning
 import random
+from dqn import DQN
 
 class Agent():
     def __init__(self, game, dqn, alpha=0.001, gamma=0.9):
         self.game = game
         self.alpha = alpha
         self.gamma = gamma
-        self.dqn = dqn
+        self.dqn = DQN(self.game.is_valid_action)
 
     def turn(self, state):
         self.previous_state = state
@@ -23,12 +24,12 @@ class Agent():
             a = self.explore(state)
         else:
             # exploit
-            max_action, success = self.dqn.get_argmax_action(state)
+            max_action, success = self.dqn.get_action(state)
 
-            if success == None:
+            if not success:
                 a = self.explore(state)
-
-            a = max_action
+            else:
+                a = max_action
 
         return a
 
@@ -41,6 +42,6 @@ class Agent():
         return a
 
     def update(self, reward, new_state):
-        self.dqn.store(self.previous_state, self.action, reward, new_state)
+        self.dqn.store(self.action, reward, new_state)
         self.dqn.learn()
 

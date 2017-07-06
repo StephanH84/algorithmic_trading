@@ -52,13 +52,17 @@ def evaluate(phi_):
         result = sess.run(output, feed_dict={phi: phi_})
         return result
 
-board = [[-1, 0, 1], [1, 0, 0], [1, 1, 0]]
-board_ = tf.constant([4 * [board]])
-phi_ = tf.transpose(board_, [0, 2, 3, 1])
+def test_evaluate():
+    board = [[-1, 0, 1], [1, 0, 0], [1, 1, 0]]
+    board_ = tf.constant([4 * [board]])
+    phi_ = tf.transpose(board_, [0, 2, 3, 1])
 
-with tf.Session() as sess:
-    phi_ = sess.run(phi_)
-res = evaluate(phi_)
+    with tf.Session() as sess:
+        phi_ = sess.run(phi_)
+    res = evaluate(phi_)
+    return phi_
+
+
 
 
 output_evaluated = tf.reduce_sum(output * actions, axis=[1, 2])
@@ -81,22 +85,23 @@ def learn(batch):
             train_accuracy = accuracy.eval(feed_dict=batch_dict)
             print('train accuracy %g' % train_accuracy)
 
-y_batch = [1, 2]
-phi__ = [tf.constant(phi_)] * 2
-print(tf.size(phi__))
-phi_batch_ = tf.squeeze(phi__)
-with tf.Session() as sess:
-    phi_batch = sess.run(phi_batch_)
+def test_learn(phi_):
+    y_batch = [1, 2]
+    phi__ = [tf.constant(phi_)] * 2
+    print(tf.size(phi__))
+    phi_batch_ = tf.squeeze(phi__)
+    with tf.Session() as sess:
+        phi_batch = sess.run(phi_batch_)
 
-def actions_to_matrix(action):
-    matrix = np.zeros([3, 3])
-    matrix[action[0], action[1]] = 1
-    return matrix
-
-
-actions_batch = [actions_to_matrix([0, 2]), actions_to_matrix([1, 0])]
+    def actions_to_matrix(action):
+        matrix = np.zeros([3, 3])
+        matrix[action[0], action[1]] = 1
+        return matrix
 
 
+    actions_batch = [actions_to_matrix([0, 2]), actions_to_matrix([1, 0])]
 
-batch = [y_batch, phi_batch, actions_batch]
-learn(batch)
+
+
+    batch = [y_batch, phi_batch, actions_batch]
+    learn(batch)

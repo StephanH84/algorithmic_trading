@@ -1,19 +1,27 @@
-# TODO: Implement DQN-algorithm using the network interface
-import numpy as np
+# TODO: Implement part of the DQN-algorithm using the network interface (the other up-to-now in network.py)
+from network import Network
+import random
 
 
 class DQN():
-    def __init__(self, network):
-        self.network = network
+    def __init__(self, state_is_terminal):
+        self.network = Network(state_is_terminal)
         self.replay_memory = []
-        self.step_count = 0
         self.history = []
         self.step_size = 4
+        self.N = 10
 
-    def get_argmax_action(self, state):
-        action = None
+    def get_action(self, state):
         success = True
-        # TODO: Query Q-network
+
+        new_phi = (self.history + [state])[-self.step_size:]
+        if len(new_phi) == self.step_size:
+            # Query Q-network
+            action = self.network.evaluate(new_phi)
+        else:
+            success = False
+            action = None
+
         return action, success
 
     def store(self, action, reward, new_state):
@@ -24,11 +32,16 @@ class DQN():
             self.replay_memory.append([phi, action, reward, new_phi])
         self.history.append(new_state)
 
-    def learn(self, C=10):
+    def learn(self):
+        # provide minibatch
+        replay_size = len(self.replay_memory)
+        if replay_size >= self.step_size:
+            index_list = []
+            for n in range(self.N):
+                index_list.append(random.randint(0, replay_size-1))
+            index_list = list(set(index_list))
 
-        if self.count % C == 0:
-            self.reset()
-        self.count += 1
+            minibatch = [self.replay_memory[p] for p in index_list]
 
-    def reset(self):
-        pass
+            self.network.learn(minibatch)
+
