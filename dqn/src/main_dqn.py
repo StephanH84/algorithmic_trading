@@ -10,7 +10,7 @@ def main():
     # agentB = Agent(game, alpha, gamma)
     runGame = RunRL(game, agentA, agentA)
 
-    runGame.run(episodes=150)
+    runGame.run(episodes=50)
 
 
 main()

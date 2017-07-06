@@ -33,7 +33,7 @@ class Network():
 
     def initialize(self):
         self.round_counter = 0
-        self.C = 20
+        self.C = 10
 
         self.y = tf.placeholder(tf.float32, shape=[None])
         self.actions = tf.placeholder(tf.float32, shape=[None, 3, 3])
@@ -60,16 +60,16 @@ class Network():
 
 
     def define_network(self, phi):
-        self.W_conv1 = weight_variable([3, 3, self.step_size, 16])
-        self.b_conv1 = bias_variable([3, 3, 16])
+        self.W_conv1 = weight_variable([3, 3, self.step_size, self.step_size * 4])
+        self.b_conv1 = bias_variable([3, 3, self.step_size * 4])
         h_conv1 = tf.nn.relu(conv2d(phi, self.W_conv1) + self.b_conv1)
 
-        self.W_conv2 = weight_variable([3, 3, 16, 32])
-        self.b_conv2 = bias_variable([3, 3, 32])
+        self.W_conv2 = weight_variable([3, 3, self.step_size * 4, self.step_size * 8])
+        self.b_conv2 = bias_variable([3, 3, self.step_size * 8])
         h_conv2 = tf.nn.relu(conv2d(h_conv1, self.W_conv2) + self.b_conv2)
 
-        h_conv2_reshaped = tf.reshape(h_conv2, [-1, 3 * 3 * 32])
-        self.W_fcn = weight_variable([3 * 3 * 32, 9])
+        h_conv2_reshaped = tf.reshape(h_conv2, [-1, 3 * 3 * self.step_size * 8])
+        self.W_fcn = weight_variable([3 * 3 * self.step_size * 8, 9])
         self.b = bias_variable([9])
 
         y = tf.matmul(h_conv2_reshaped, self.W_fcn) + self.b
@@ -90,19 +90,17 @@ class Network():
 
     def evaluate(self, phi):
         # returns the argmax action for given phi
-        phi_ = self.sess.run(tf.transpose([np.asarray(phi).tolist()], [0, 2, 3, 1]))
+        phi_ = self.t1(phi)
         output_value = self.sess.run(self.output, feed_dict={self.phi: phi_})[0]
         return output_value
 
     def perform_sgd(self, y_, phi_, actions_):
-        with tf.Session() as sess:
-            sess.run(tf.global_variables_initializer())
-            for episode in range(3):
-                batch_dict = {self.y: y_, self.phi: phi_, self.actions: actions_}
-                self.train_step.run(feed_dict=batch_dict)
-                #train_accuracy = self.accuracy.eval(feed_dict=batch_dict)
-                #train_loss = self.loss.eval(feed_dict=batch_dict)
-                #print('train accuracy %g, train loss %g' % (train_accuracy, train_loss))
+        phi_2 = self.sess.run(tf.transpose(np.asarray(phi_).tolist(), [0, 2, 3, 1]))
+        batch_dict = {self.y: y_, self.phi: phi_2, self.actions: actions_}
+        self.sess.run(self.train_step, feed_dict=batch_dict)
+        # train_accuracy = self.sess.run(self.accuracy, feed_dict=batch_dict)
+        # train_loss = self.sess.run(self.loss, feed_dict=batch_dict)
+        # print('train accuracy %g, train loss %g' % (train_accuracy, train_loss))
 
     def learn(self, minibatch):
         self.round_counter += 1
@@ -116,7 +114,7 @@ class Network():
                 value = batch[2]
             else:
 
-                feed_dict = {self.phi: np.asarray([batch[3]]).tolist(),
+                feed_dict = {self.phi: self.t1(batch[3]),
                              self.W_conv1: self.W_conv1_saved,
                              self.b_conv1: self.b_conv1_saved,
                              self.W_conv2: self.W_conv2_saved,
@@ -135,3 +133,6 @@ class Network():
 
         if self.round_counter % self.C == 0:
             self.save_weights()
+
+    def t1(self, phi):
+        return self.sess.run(tf.transpose([np.asarray(phi).tolist()], [0, 2, 3, 1]))

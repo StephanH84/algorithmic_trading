@@ -65,7 +65,7 @@ class TicTacToe():
         if status == self.StateResult.WIN:
             return 1
         elif status == self.StateResult.LOSS:
-            return -20 # very large negative reward to make to make it dislike losing
+            return -5 # large negative reward to make to make it dislike losing
         elif status == self.StateResult.UNDEFINED:
             return 0
         elif status == self.StateResult.DRAW:

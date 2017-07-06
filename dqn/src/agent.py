@@ -36,8 +36,9 @@ class Agent():
 
                 action_list = sorted(action_list, key=lambda item: -item[2])
                 for action in action_list:
-                    if self.game.__class__.is_valid_action(state, action):
-                        return action
+                    a = [action[0], action[1]]
+                    if self.game.__class__.is_valid_action(state, a):
+                        return a
 
                 a = self.explore(state)
 
