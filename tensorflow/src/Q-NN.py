@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 
 def weight_variable(shape):
   initial = tf.truncated_normal(shape, stddev=0.1)
@@ -37,7 +38,7 @@ def define_network():
 
     output_ = tf.nn.softmax(y)
 
-    output = tf.reshape(output_, [3, 3])
+    output = tf.reshape(output_, [-1, 3, 3])
 
     return output
 
@@ -45,30 +46,57 @@ def define_network():
 
 output = define_network() #model of phi with parameters theta
 
+def evaluate(phi_):
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        result = sess.run(output, feed_dict={phi: phi_})
+        return result
+
+board = [[-1, 0, 1], [1, 0, 0], [1, 1, 0]]
+board_ = tf.constant([4 * [board]])
+phi_ = tf.transpose(board_, [0, 2, 3, 1])
+
+with tf.Session() as sess:
+    phi_ = sess.run(phi_)
+res = evaluate(phi_)
+
 
 output_evaluated = tf.reduce_sum(output * actions, axis=[1, 2])
 loss = tf.reduce_sum(tf.squared_difference(y, output_evaluated))
 
 train_step = tf.train.AdamOptimizer(1e-4).minimize(loss)
 
-output_action = tf.argmax(tf.reshape(output, [9]))
+output_action = tf.argmax(tf.reshape(output, [-1, 9]))
 action_ = tf.argmax(tf.reshape(actions, [-1, 9]))
 correct_prediction = tf.equal(output_action, action_)
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
-# TODO: function to evaluate Q-network
-def learn():
+
+def learn(batch):
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
-        batch = None # TODO
+        for episode in range(3):
+            batch_dict = {y: batch[0], phi: batch[1], actions: batch[2]}
+            train_step.run(feed_dict=batch_dict)
+            train_accuracy = accuracy.eval(feed_dict=batch_dict)
+            print('train accuracy %g' % train_accuracy)
 
-        batch_dict = {y: batch[0], phi: batch[1], actions: batch[2]}
-        train_step.run(feed_dict=batch_dict)
-        train_accuracy = accuracy.eval(feed_dict=batch_dict)
-        print('train accuracy %g' % train_accuracy)
+y_batch = [1, 2]
+phi__ = [tf.constant(phi_)] * 2
+print(tf.size(phi__))
+phi_batch_ = tf.squeeze(phi__)
+with tf.Session() as sess:
+    phi_batch = sess.run(phi_batch_)
 
-def evaluate(phi):
-    with tf.Session() as sess:
-        result = sess.run(output, feed_dict={phi: phi})
-        return result
+def actions_to_matrix(action):
+    matrix = np.zeros([3, 3])
+    matrix[action[0], action[1]] = 1
+    return matrix
 
+
+actions_batch = [actions_to_matrix([0, 2]), actions_to_matrix([1, 0])]
+
+
+
+batch = [y_batch, phi_batch, actions_batch]
+learn(batch)
