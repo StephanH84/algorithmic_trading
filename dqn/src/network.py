@@ -91,8 +91,8 @@ class Network():
     def evaluate(self, phi):
         # returns the argmax action for given phi
         phi_ = self.sess.run(tf.transpose([np.asarray(phi).tolist()], [0, 2, 3, 1]))
-        action_value = self.sess.run(self.output_action, feed_dict={self.phi: phi_})
-        return action_value
+        output_value = self.sess.run(self.output, feed_dict={self.phi: phi_})[0]
+        return output_value
 
     def perform_sgd(self, y_, phi_, actions_):
         with tf.Session() as sess:

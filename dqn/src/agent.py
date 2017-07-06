@@ -29,12 +29,17 @@ class Agent():
             if not success:
                 a = self.explore(state)
             else:
-                y = action_value % 3
-                x = int(action_value / 3)
-                a = [x, y]
+                action_list = []
+                for row in range(3):
+                    for column in range(3):
+                        action_list.append([row, column, action_value[row, column]])
 
-                if not self.game.__class__.is_valid_action(state, a): # TODO: Probably not well adjusted; better to check the second or third best before
-                    a = self.explore(state)
+                action_list = sorted(action_list, key=lambda item: -item[2])
+                for action in action_list:
+                    if self.game.__class__.is_valid_action(state, action):
+                        return action
+
+                a = self.explore(state)
 
         return a
 

@@ -7,7 +7,7 @@ class DQN():
     def __init__(self, state_is_terminal, alpha, gamma):
         self.replay_memory = []
         self.history = []
-        self.step_size = 3
+        self.step_size = 1 # since Tic-Tac-Toe is a Markov-Model-game, the history is not necessary
         self.network = Network(state_is_terminal, self.step_size, alpha, gamma)
         self.N = 10
 
@@ -17,12 +17,12 @@ class DQN():
         new_phi = self.history[-self.step_size:]
         if len(new_phi) == self.step_size:
             # Query Q-network
-            action = self.network.evaluate(new_phi)
+            output_value = self.network.evaluate(new_phi)
         else:
             success = False
-            action = None
+            output_value = None
 
-        return action, success
+        return output_value, success
 
     def store(self, action, reward, new_state):
         phi = self.history[-self.step_size:]
