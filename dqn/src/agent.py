@@ -24,12 +24,14 @@ class Agent():
             a = self.explore(state)
         else:
             # exploit
-            max_action, success = self.dqn.get_action(state)
+            action_value, success = self.dqn.get_action(state)
 
             if not success:
                 a = self.explore(state)
             else:
-                a = max_action
+                y = action_value % 3
+                x = int(action_value / 3)
+                a = [x, y]
 
         return a
 

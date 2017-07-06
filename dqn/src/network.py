@@ -1,5 +1,6 @@
 # TODO: Implement deep neural network (and resp. interface) for Q-function approximation
 import tensorflow as tf
+import numpy as np
 
 def weight_variable(shape):
   initial = tf.truncated_normal(shape, stddev=0.1)
@@ -12,6 +13,11 @@ def bias_variable(shape):
 def conv2d(x, W):
   return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
 
+
+def actions_to_matrix(action):
+    matrix = np.zeros([3, 3])
+    matrix[action[0], action[1]] = 1
+    return matrix
 
 class Network():
     def __init__(self, state_is_terminal):
@@ -40,8 +46,8 @@ class Network():
 
         self.train_step = tf.train.AdamOptimizer(1e-4).minimize(self.loss)
 
-        self.output_action = tf.argmax(tf.reshape(self.output, [-1, 9]))
-        action_ = tf.argmax(tf.reshape(self.actions, [-1, 9]))
+        self.output_action = tf.argmax(tf.reshape(self.output, [-1, 9])[0])
+        action_ = tf.argmax(tf.reshape(self.actions, [-1, 9])[0])
         correct_prediction = tf.equal(self.output_action, action_)
         self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
@@ -83,7 +89,8 @@ class Network():
 
     def evaluate(self, phi):
         # returns the argmax action for given phi
-        action_value = self.sess.run(self.output_action, feed_dict={self.phi: phi})
+        phi_ = self.sess.run(tf.transpose([np.asarray(phi).tolist()], [0, 2, 3, 1]))
+        action_value = self.sess.run(self.output_action, feed_dict={self.phi: phi_})
         return action_value
 
     def perform_sgd(self, y_, phi_, actions_):
@@ -119,7 +126,7 @@ class Network():
                 max_value = tf.reduce_max(output_value)
                 value = batch[2] + self.gamma * max_value
             y.append(value)
-            actions.append(batch[1])
+            actions.append(actions_to_matrix(batch[1]))
             phi.append(batch[0])
 
         self.perform_sgd(y, phi, actions)

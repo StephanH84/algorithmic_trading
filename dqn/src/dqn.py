@@ -14,7 +14,7 @@ class DQN():
     def get_action(self, state):
         success = True
 
-        new_phi = (self.history + [state])[-self.step_size:]
+        new_phi = self.history[-self.step_size:]
         if len(new_phi) == self.step_size:
             # Query Q-network
             action = self.network.evaluate(new_phi)
@@ -30,7 +30,7 @@ class DQN():
 
         if len(phi) == self.step_size and len(new_phi) == self.step_size:
             self.replay_memory.append([phi, action, reward, new_phi])
-        self.history.append(new_state)
+        self.history.append(new_state.copy())
 
     def learn(self):
         # provide minibatch

@@ -70,8 +70,8 @@ loss = tf.reduce_sum(tf.squared_difference(y, output_evaluated))
 
 train_step = tf.train.AdamOptimizer(1e-4).minimize(loss)
 
-output_action = tf.argmax(tf.reshape(output, [-1, 9]))
-action_ = tf.argmax(tf.reshape(actions, [-1, 9]))
+output_action = tf.argmax(tf.reshape(output, [-1, 9])[0])
+action_ = tf.argmax(tf.reshape(actions, [-1, 9])[0])
 correct_prediction = tf.equal(output_action, action_)
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
