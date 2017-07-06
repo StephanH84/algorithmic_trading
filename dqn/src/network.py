@@ -69,8 +69,8 @@ class Network():
         h_conv2 = tf.nn.relu(conv2d(h_conv1, self.W_conv2) + self.b_conv2)
 
         h_conv2_reshaped = tf.reshape(h_conv2, [-1, 3 * 3 * 32])
-        self.W_fcn = tf.Variable(tf.zeros([3 * 3 * 32, 9]))
-        self.b = tf.Variable(tf.zeros([9]))
+        self.W_fcn = weight_variable([3 * 3 * 32, 9])
+        self.b = bias_variable([9])
 
         y = tf.matmul(h_conv2_reshaped, self.W_fcn) + self.b
 

@@ -167,6 +167,7 @@ class RunRL():
 
             if state in [self.game.StateResult.WIN, self.game.StateResult.LOSS, self.game.StateResult.DRAW]:
                 game_counter += 1
+                print("game_counter: %s" % game_counter)
                 self.game.reset()
                 self.agentA.reset_history()
                 self.agentB.reset_history()
