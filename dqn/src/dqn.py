@@ -1,6 +1,7 @@
 # TODO: Implement part of the DQN-algorithm using the network interface (the other up-to-now in network.py)
 from network import Network
 import random
+import time
 
 
 class DQN():
@@ -10,6 +11,7 @@ class DQN():
         self.step_size = 1 # since Tic-Tac-Toe is a Markov-Model-game, the history is not necessary
         self.network = Network(state_is_terminal, self.step_size, alpha, gamma)
         self.N = 32
+        self.learn_time_random = []
 
     def get_action(self, state):
         success = True
@@ -37,8 +39,11 @@ class DQN():
         replay_size = len(self.replay_memory)
         if replay_size >= self.step_size:
             index_list = []
+            t0 = time.time()
             for n in range(self.N):
                 index_list.append(random.randint(0, replay_size-1))
+            t1 = time.time()
+            self.learn_time_random.append(t1 - t0)
             index_list = list(set(index_list))
 
             minibatch = [self.replay_memory[p] for p in index_list]

@@ -1,6 +1,7 @@
 # TODO: Implement deep neural network (and resp. interface) for Q-function approximation
 import tensorflow as tf
 import numpy as np
+import time
 
 def weight_variable(shape):
   initial = tf.truncated_normal(shape, stddev=0.1)
@@ -25,7 +26,15 @@ class Network():
         self.alpha = alpha
         self.gamma = gamma
         self.step_size = step_size
+        self.time_save_weights = []
+        self.time_evaluate_t1 = []
+        self.time_evaluate_run = []
+        self.time_perform_sgd_t1 = []
+        self.time_perform_sgd_run = []
+        self.time_learn_t1 = []
+        self.time_learn_run = []
         self.initialize()
+
 
     def __del__(self):
         if self.sess is not None:
@@ -81,23 +90,38 @@ class Network():
         return output
 
     def save_weights(self):
+        t0 = time.time()
         self.W_conv1_saved = self.sess.run(self.W_conv1)
         self.b_conv1_saved = self.sess.run(self.b_conv1)
         self.W_conv2_saved = self.sess.run(self.W_conv2)
         self.b_conv2_saved = self.sess.run(self.b_conv2)
         self.W_fcn_saved = self.sess.run(self.W_fcn)
         self.b_saved = self.sess.run(self.b)
+        t1 = time.time()
+        self.time_save_weights.append(t1 - t0)
 
     def evaluate(self, phi):
         # returns the argmax action for given phi
+        t0 = time.time()
         phi_ = self.t1(phi)
+        t1 = time.time()
         output_value = self.sess.run(self.output, feed_dict={self.phi: phi_})[0]
+        t2 = time.time()
+
+        self.time_evaluate_t1.append(t1 - t0) # Result: takes too long
+        self.time_evaluate_run.append(t2 - t1)
         return output_value
 
     def perform_sgd(self, y_, phi_, actions_):
-        phi_2 = self.sess.run(tf.transpose(np.asarray(phi_).tolist(), [0, 2, 3, 1]))
+        t0 = time.time()
+        phi_2 = self.t2(phi_)
+        t1 = time.time()
         batch_dict = {self.y: y_, self.phi: phi_2, self.actions: actions_}
         self.sess.run(self.train_step, feed_dict=batch_dict)
+        t2 = time.time()
+
+        self.time_perform_sgd_t1.append(t1 - t0) # Result: Takes too long
+        self.time_perform_sgd_run.append(t2 - t1)
         # train_accuracy = self.sess.run(self.accuracy, feed_dict=batch_dict)
         # train_loss = self.sess.run(self.loss, feed_dict=batch_dict)
         # print('train accuracy %g, train loss %g' % (train_accuracy, train_loss))
@@ -113,7 +137,7 @@ class Network():
             if self.state_is_terminal(batch[3][-1]):
                 value = batch[2]
             else:
-
+                t0 = time.time()
                 feed_dict = {self.phi: self.t1(batch[3]),
                              self.W_conv1: self.W_conv1_saved,
                              self.b_conv1: self.b_conv1_saved,
@@ -122,7 +146,11 @@ class Network():
                              self.W_fcn: self.W_fcn_saved,
                              self.b: self.b_saved}
 
+                t1 = time.time()
                 output_value = self.sess.run(self.output, feed_dict=feed_dict)
+                t2 = time.time()
+                self.time_learn_t1.append(t1 - t0)
+                self.time_learn_run.append(t2 - t1)
                 max_value = np.max(output_value)
                 value = batch[2] + self.gamma * max_value
             y.append(value)
@@ -134,5 +162,13 @@ class Network():
         if self.round_counter % self.C == 0:
             self.save_weights()
 
-    def t1(self, phi):
+    def t1_(self, phi):
         return self.sess.run(tf.transpose([np.asarray(phi).tolist()], [0, 2, 3, 1]))
+
+    def t1(self, phi):
+        phi_np = np.asarray([phi])
+        return np.swapaxes(np.swapaxes(phi_np, 1, 2), 2, 3)
+
+    def t2(self, phi):
+        phi_np = np.asarray(phi)
+        return np.swapaxes(np.swapaxes(phi_np, 1, 2), 2, 3)
