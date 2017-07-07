@@ -9,7 +9,7 @@ class DQN():
         self.history = []
         self.step_size = 1 # since Tic-Tac-Toe is a Markov-Model-game, the history is not necessary
         self.network = Network(state_is_terminal, self.step_size, alpha, gamma)
-        self.N = 10
+        self.N = 32
 
     def get_action(self, state):
         success = True
