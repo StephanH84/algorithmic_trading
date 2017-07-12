@@ -1,4 +1,4 @@
-# TODO: Implement deep neural network (and resp. interface) for Q-function approximation
+# Implementation of deep neural network (and resp. interface) for Q-function approximation
 # This version is according to the official literature, i.e. Mnih's version (reason: to be prepared for the extensions DDQN)
 
 import tensorflow as tf
@@ -44,9 +44,9 @@ class Network():
         if self.sess is not None:
             self.sess.close()
 
-    def initialize(self):
+    def initialize(self, C=10):
         self.round_counter = 0
-        self.C = 10
+        self.C = C
 
         self.y = tf.placeholder(tf.float32, shape=[None])
         self.actions = tf.placeholder(tf.float32, shape=[None, 3, 3])
@@ -126,7 +126,7 @@ class Network():
                          self.W_fcn: self.W_fcn_target,
                          self.b: self.b_target
                          }
-        output_value = self.sess.run(self.output, feed_dict=feed_dict)[0] #.update({self.keep_prob: 1.0}))[0]
+        output_value = self.sess.run(self.output, feed_dict=feed_dict.update({self.keep_prob: 1.0}))[0]
         t2 = time.time()
 
         self.time_evaluate_t1.append(t1 - t0) # Result: takes too long
@@ -138,7 +138,7 @@ class Network():
         phi_2 = self.transformation2(phi_)
         t1 = time.time()
         batch_dict = {self.y: y_, self.phi: phi_2, self.actions: actions_}
-        self.sess.run(self.train_step, feed_dict=batch_dict) # .update({self.keep_prob: 0.7}))
+        self.sess.run(self.train_step, feed_dict=batch_dict.update({self.keep_prob: 0.7}))
         t2 = time.time()
 
         self.time_perform_sgd_t1.append(t1 - t0) # Result: Takes too long
@@ -185,7 +185,7 @@ class Network():
                          self.b: self.b_target}
 
             t1 = time.time()
-            output_value = self.sess.run(self.output, feed_dict=feed_dict)# .update({self.keep_prob: 1.0}))
+            output_value = self.sess.run(self.output, feed_dict=feed_dict.update({self.keep_prob: 1.0}))
             t2 = time.time()
             self.time_learn_t1.append(t1 - t0)
             self.time_learn_run.append(t2 - t1)
@@ -207,7 +207,7 @@ class Network():
             # get max_action on online network
             feed_dict = {self.phi: self.transformation1(batch[3])}
 
-            action_value = self.sess.run(self.output_action, feed_dict=feed_dict) #.update({self.keep_prob: 1.0}))
+            action_value = self.sess.run(self.output_action, feed_dict=feed_dict.update({self.keep_prob: 1.0}))
             max_action = self.map_action_value_to_action_vector(action_value)
 
             feed_dict = {self.phi: self.transformation1(batch[3]),
@@ -218,7 +218,7 @@ class Network():
                          self.W_fcn: self.W_fcn_target,
                          self.b: self.b_target}
 
-            output_value = self.sess.run(self.output, feed_dict=feed_dict)[0] #.update({self.keep_prob: 1.0}))[0]
+            output_value = self.sess.run(self.output, feed_dict=feed_dict.update({self.keep_prob: 1.0}))[0]
 
             target_value = output_value[max_action[0], max_action[1]]
 
