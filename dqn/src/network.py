@@ -1,4 +1,6 @@
 # TODO: Implement deep neural network (and resp. interface) for Q-function approximation
+# This version is according to the official literature, i.e. Mnih's version (reason: to be prepared for the extensions DDQN)
+
 import tensorflow as tf
 import numpy as np
 import time
@@ -26,6 +28,7 @@ class Network():
         self.alpha = alpha
         self.gamma = gamma
         self.step_size = step_size
+
         self.time_save_weights = []
         self.time_evaluate_t1 = []
         self.time_evaluate_run = []
@@ -33,6 +36,7 @@ class Network():
         self.time_perform_sgd_run = []
         self.time_learn_t1 = []
         self.time_learn_run = []
+
         self.initialize()
 
 
@@ -91,21 +95,32 @@ class Network():
 
     def save_weights(self):
         t0 = time.time()
-        self.W_conv1_saved = self.sess.run(self.W_conv1)
-        self.b_conv1_saved = self.sess.run(self.b_conv1)
-        self.W_conv2_saved = self.sess.run(self.W_conv2)
-        self.b_conv2_saved = self.sess.run(self.b_conv2)
-        self.W_fcn_saved = self.sess.run(self.W_fcn)
-        self.b_saved = self.sess.run(self.b)
+        self.W_conv1_target = self.sess.run(self.W_conv1)
+        self.b_conv1_target = self.sess.run(self.b_conv1)
+        self.W_conv2_target = self.sess.run(self.W_conv2)
+        self.b_conv2_target = self.sess.run(self.b_conv2)
+        self.W_fcn_target = self.sess.run(self.W_fcn)
+        self.b_target = self.sess.run(self.b)
         t1 = time.time()
         self.time_save_weights.append(t1 - t0)
 
-    def evaluate(self, phi):
+    def evaluate(self, phi, target_network=False):
         # returns the argmax action for given phi
         t0 = time.time()
-        phi_ = self.t1(phi)
+        phi_ = self.transformation1(phi)
         t1 = time.time()
-        output_value = self.sess.run(self.output, feed_dict={self.phi: phi_})[0]
+        if not target_network:
+            feed_dict = {self.phi: phi_}
+        else:
+            feed_dict = {self.phi: phi_,
+                         self.W_conv1: self.W_conv1_target,
+                         self.b_conv1: self.b_conv1_target,
+                         self.W_conv2: self.W_conv2_target,
+                         self.b_conv2: self.b_conv2_target,
+                         self.W_fcn: self.W_fcn_target,
+                         self.b: self.b_target
+                         }
+        output_value = self.sess.run(self.output, feed_dict=feed_dict)[0]
         t2 = time.time()
 
         self.time_evaluate_t1.append(t1 - t0) # Result: takes too long
@@ -114,7 +129,7 @@ class Network():
 
     def perform_sgd(self, y_, phi_, actions_):
         t0 = time.time()
-        phi_2 = self.t2(phi_)
+        phi_2 = self.transformation2(phi_)
         t1 = time.time()
         batch_dict = {self.y: y_, self.phi: phi_2, self.actions: actions_}
         self.sess.run(self.train_step, feed_dict=batch_dict)
@@ -134,25 +149,7 @@ class Network():
         actions = []
         phi = []
         for batch in minibatch:
-            if self.state_is_terminal(batch[3][-1]):
-                value = batch[2]
-            else:
-                t0 = time.time()
-                feed_dict = {self.phi: self.t1(batch[3]),
-                             self.W_conv1: self.W_conv1_saved,
-                             self.b_conv1: self.b_conv1_saved,
-                             self.W_conv2: self.W_conv2_saved,
-                             self.b_conv2: self.b_conv2_saved,
-                             self.W_fcn: self.W_fcn_saved,
-                             self.b: self.b_saved}
-
-                t1 = time.time()
-                output_value = self.sess.run(self.output, feed_dict=feed_dict)
-                t2 = time.time()
-                self.time_learn_t1.append(t1 - t0)
-                self.time_learn_run.append(t2 - t1)
-                max_value = np.max(output_value)
-                value = batch[2] + self.gamma * max_value
+            value = self.calculate_y(batch)
             y.append(value)
             actions.append(actions_to_matrix(batch[1]))
             phi.append(batch[0])
@@ -162,13 +159,69 @@ class Network():
         if self.round_counter % self.C == 0:
             self.save_weights()
 
-    def t1_(self, phi):
-        return self.sess.run(tf.transpose([np.asarray(phi).tolist()], [0, 2, 3, 1]))
+    def calculate_y(self, batch, DDQN=True):
+        if DDQN:
+            return self.calculate_y_DDQN(batch)
 
-    def t1(self, phi):
+        # Now additionally with Double DQN
+        if self.state_is_terminal(batch[3][-1]):
+            value = batch[2]
+        else:
+            t0 = time.time()
+
+            # switch to target network parameters
+            feed_dict = {self.phi: self.transformation1(batch[3]),
+                         self.W_conv1: self.W_conv1_target,
+                         self.b_conv1: self.b_conv1_target,
+                         self.W_conv2: self.W_conv2_target,
+                         self.b_conv2: self.b_conv2_target,
+                         self.W_fcn: self.W_fcn_target,
+                         self.b: self.b_target}
+
+            t1 = time.time()
+            output_value = self.sess.run(self.output, feed_dict=feed_dict)
+            t2 = time.time()
+            self.time_learn_t1.append(t1 - t0)
+            self.time_learn_run.append(t2 - t1)
+            max_value = np.max(output_value)
+
+            value = batch[2] + self.gamma * max_value
+        return value
+
+    @staticmethod
+    def map_action_value_to_action_vector(action_value):
+        return [int(action_value / 3), action_value % 3]
+
+    def calculate_y_DDQN(self, batch):
+        # Now additionally with Double DQN
+        if self.state_is_terminal(batch[3][-1]):
+            value = batch[2]
+        else:
+            # get max_action on online network
+            feed_dict = {self.phi: self.transformation1(batch[3])}
+
+            action_value = self.sess.run(self.output_action, feed_dict=feed_dict)
+            max_action = self.map_action_value_to_action_vector(action_value)
+
+            feed_dict = {self.phi: self.transformation1(batch[3]),
+                         self.W_conv1: self.W_conv1_target,
+                         self.b_conv1: self.b_conv1_target,
+                         self.W_conv2: self.W_conv2_target,
+                         self.b_conv2: self.b_conv2_target,
+                         self.W_fcn: self.W_fcn_target,
+                         self.b: self.b_target}
+
+            output_value = self.sess.run(self.output, feed_dict=feed_dict)
+
+            target_value = output_value[action_value[0], action_value[1]]
+
+            value = batch[2] + self.gamma * target_value
+        return value
+
+    def transformation1(self, phi):
         phi_np = np.asarray([phi])
         return np.swapaxes(np.swapaxes(phi_np, 1, 2), 2, 3)
 
-    def t2(self, phi):
+    def transformation2(self, phi):
         phi_np = np.asarray(phi)
         return np.swapaxes(np.swapaxes(phi_np, 1, 2), 2, 3)
