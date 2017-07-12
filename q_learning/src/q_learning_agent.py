@@ -27,7 +27,7 @@ class q_function():
             return []
 
         result = []
-        for action_encoded, value in action_value_dict.iteritems():
+        for action_encoded, value in action_value_dict.items():
             action = json.loads(action_encoded)
             result.append([action, value])
 
@@ -85,22 +85,20 @@ class Agent():
         if rnd < eps or not self.q.has_state(state):
             # explore
             a = self.explore(state)
+            return a
         else:
             # exploit
-            max_action, max_value = None, None
-            for action, value in self.q.get_list(state):
-                if max_value == None:
-                    max_action, max_value = action, value
 
-                if max_value < value:
-                    max_action, max_value = action, value
+            action_value_list = self.q.get_list(state)
+            action_value_list = sorted(action_value_list, key=lambda item: -item[1])
 
-            if max_action == None:
-                a = self.explore(state)
+            for action, _ in action_value_list:
+                if self.game.__class__.is_valid_action(state, action):
+                    return action
 
-            a = max_action
+            a = self.explore(state)
+            return a
 
-        return a
 
     def explore(self, state):
         action_space = self.game.get_available_action_space()
@@ -131,3 +129,6 @@ class Agent():
 
         incr = self.alpha * (r + self.gamma * maxQ - self.q.get_value(s, a))
         self.q.add_value(s, a, incr)
+
+    def reset_history(self):
+        pass

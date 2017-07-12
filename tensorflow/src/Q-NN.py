@@ -53,7 +53,7 @@ output = define_network() #model of phi with parameters theta
 def evaluate(phi_):
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
-        result = sess.run(output, feed_dict={phi: phi_})
+        result = sess.run(output, feed_dict={phi: phi_, keep_prob: 1.0})
         return result
 
 def test_evaluate():
@@ -67,7 +67,7 @@ def test_evaluate():
     return phi_
 
 
-test_evaluate()
+ret = test_evaluate()
 exit()
 
 output_evaluated = tf.reduce_sum(output * actions, axis=[1, 2])

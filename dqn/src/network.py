@@ -28,6 +28,7 @@ class Network():
         self.alpha = alpha
         self.gamma = gamma
         self.step_size = step_size
+        self.keep_prob_value = 0.8
 
         self.time_save_weights = []
         self.time_evaluate_t1 = []
@@ -48,11 +49,16 @@ class Network():
         self.round_counter = 0
         self.C = C
 
+        # Define placeholders
         self.y = tf.placeholder(tf.float32, shape=[None])
         self.actions = tf.placeholder(tf.float32, shape=[None, 3, 3])
 
         # state_seq
         self.phi = tf.placeholder(tf.float32, shape=[None, 3, 3, self.step_size])
+
+        self.keep_prob = tf.placeholder(tf.float32)
+
+        # Define network
         self.output = self.define_network(self.phi)
 
         output_evaluated = tf.reduce_sum(self.output * self.actions, axis=[1, 2])
@@ -73,19 +79,62 @@ class Network():
 
 
     def define_network(self, phi):
+        # Try a fully contected NN
+
+        # Flatten:
+        input_size = 3 * 3 * self.step_size
+        input = tf.reshape(phi, [-1, input_size])
+
+        self.W0 = weight_variable([input_size, 64])
+        self.b0 = bias_variable([64])
+        o0 = tf.matmul(input, self.W0) + self.b0
+        hidden0 = tf.nn.relu(o0)
+
+        self.drop0 = tf.nn.dropout(hidden0, self.keep_prob)
+
+        self.W1 = weight_variable([64, 128])
+        self.b1 = bias_variable([128])
+        o1 = tf.matmul(hidden0, self.W1) + self.b1
+        hidden1 = tf.nn.relu(o1)
+
+        self.drop1 = tf.nn.dropout(hidden1, self.keep_prob)
+
+
+        '''self.W2 = weight_variable([128, 256])
+        self.b2 = bias_variable([256])
+        o2 = tf.matmul(hidden1, self.W2) + self.b2
+        hidden2 = tf.nn.relu(o2)
+
+        self.drop2 = tf.nn.dropout(hidden2, self.keep_prob)'''
+
+
+        self.W3 = weight_variable([128, 9])
+        self.b3 = bias_variable([9])
+        o3 = tf.matmul(hidden1, self.W3) + self.b3
+        hidden3 = tf.nn.relu(o3)
+
+        output_ = tf.nn.softmax(hidden3)
+
+        output = tf.reshape(output_, [-1, 3, 3])
+
+        self.params = [self.W0, self.b0, self.W1, self.b1] #, self.W2, self.b2,
+        self.params.extend([self.W3, self.b3])
+
+        return output
+
+
+    def define_network_old(self, phi):
         self.W_conv1 = weight_variable([3, 3, self.step_size, self.step_size * 4])
         self.b_conv1 = bias_variable([3, 3, self.step_size * 4])
         h_conv1 = tf.nn.relu(conv2d(phi, self.W_conv1) + self.b_conv1)
 
-        keep_prob = tf.placeholder(tf.float32)
-        self.keep_prob = keep_prob
-        tf.nn.dropout(h_conv1, keep_prob)
+        self.drop1 = tf.nn.dropout(h_conv1, self.keep_prob)
 
         self.W_conv2 = weight_variable([3, 3, self.step_size * 4, self.step_size * 8])
         self.b_conv2 = bias_variable([3, 3, self.step_size * 8])
         h_conv2 = tf.nn.relu(conv2d(h_conv1, self.W_conv2) + self.b_conv2)
 
-        tf.nn.dropout(h_conv2, keep_prob)
+        self.drop2 = tf.nn.dropout(h_conv2, self.keep_prob)
 
         h_conv2_reshaped = tf.reshape(h_conv2, [-1, 3 * 3 * self.step_size * 8])
         self.W_fcn = weight_variable([3 * 3 * self.step_size * 8, 9])
@@ -97,16 +146,19 @@ class Network():
 
         output = tf.reshape(output_, [-1, 3, 3])
 
+        self.params = [self.W_conv1, self.b_conv1, self.W_conv2, self.b_conv2, self.W_fcn, self.b]
+
         return output
 
     def save_weights(self):
         t0 = time.time()
-        self.W_conv1_target = self.sess.run(self.W_conv1)
-        self.b_conv1_target = self.sess.run(self.b_conv1)
-        self.W_conv2_target = self.sess.run(self.W_conv2)
-        self.b_conv2_target = self.sess.run(self.b_conv2)
-        self.W_fcn_target = self.sess.run(self.W_fcn)
-        self.b_target = self.sess.run(self.b)
+
+        self.target_params = []
+
+        for param in self.params:
+            value = self.sess.run(param)
+            self.target_params.append(value)
+
         t1 = time.time()
         self.time_save_weights.append(t1 - t0)
 
@@ -116,17 +168,16 @@ class Network():
         phi_ = self.transformation1(phi)
         t1 = time.time()
         if not target_network:
-            feed_dict = {self.phi: phi_}
+            feed_dict = {self.phi: phi_,
+                         self.keep_prob: 1.0}
         else:
             feed_dict = {self.phi: phi_,
-                         self.W_conv1: self.W_conv1_target,
-                         self.b_conv1: self.b_conv1_target,
-                         self.W_conv2: self.W_conv2_target,
-                         self.b_conv2: self.b_conv2_target,
-                         self.W_fcn: self.W_fcn_target,
-                         self.b: self.b_target
-                         }
-        output_value = self.sess.run(self.output, feed_dict=feed_dict.update({self.keep_prob: 1.0}))[0]
+                         self.keep_prob: 1.0}
+
+            for param, target_param in zip(self.params, self.target_params):
+                feed_dict[param] = target_param
+
+        output_value = self.sess.run(self.output, feed_dict=feed_dict)[0]
         t2 = time.time()
 
         self.time_evaluate_t1.append(t1 - t0) # Result: takes too long
@@ -137,8 +188,8 @@ class Network():
         t0 = time.time()
         phi_2 = self.transformation2(phi_)
         t1 = time.time()
-        batch_dict = {self.y: y_, self.phi: phi_2, self.actions: actions_}
-        self.sess.run(self.train_step, feed_dict=batch_dict.update({self.keep_prob: 0.7}))
+        batch_dict = {self.y: y_, self.phi: phi_2, self.actions: actions_, self.keep_prob: self.keep_prob_value}
+        self.sess.run(self.train_step, feed_dict=batch_dict)
         t2 = time.time()
 
         self.time_perform_sgd_t1.append(t1 - t0) # Result: Takes too long
@@ -177,15 +228,13 @@ class Network():
 
             # switch to target network parameters
             feed_dict = {self.phi: self.transformation1(batch[3]),
-                         self.W_conv1: self.W_conv1_target,
-                         self.b_conv1: self.b_conv1_target,
-                         self.W_conv2: self.W_conv2_target,
-                         self.b_conv2: self.b_conv2_target,
-                         self.W_fcn: self.W_fcn_target,
-                         self.b: self.b_target}
+                         self.keep_prob: 1.0}
+
+            for param, target_param in zip(self.params, self.target_params):
+                feed_dict[param] = target_param
 
             t1 = time.time()
-            output_value = self.sess.run(self.output, feed_dict=feed_dict.update({self.keep_prob: 1.0}))
+            output_value = self.sess.run(self.output, feed_dict=feed_dict)
             t2 = time.time()
             self.time_learn_t1.append(t1 - t0)
             self.time_learn_run.append(t2 - t1)
@@ -205,20 +254,18 @@ class Network():
             value = batch[2]
         else:
             # get max_action on online network
-            feed_dict = {self.phi: self.transformation1(batch[3])}
+            feed_dict = {self.phi: self.transformation1(batch[3]), self.keep_prob: 1.0}
 
-            action_value = self.sess.run(self.output_action, feed_dict=feed_dict.update({self.keep_prob: 1.0}))
+            action_value = self.sess.run(self.output_action, feed_dict=feed_dict)
             max_action = self.map_action_value_to_action_vector(action_value)
 
             feed_dict = {self.phi: self.transformation1(batch[3]),
-                         self.W_conv1: self.W_conv1_target,
-                         self.b_conv1: self.b_conv1_target,
-                         self.W_conv2: self.W_conv2_target,
-                         self.b_conv2: self.b_conv2_target,
-                         self.W_fcn: self.W_fcn_target,
-                         self.b: self.b_target}
+                         self.keep_prob: 1.0}
 
-            output_value = self.sess.run(self.output, feed_dict=feed_dict.update({self.keep_prob: 1.0}))[0]
+            for param, target_param in zip(self.params, self.target_params):
+                feed_dict[param] = target_param
+
+            output_value = self.sess.run(self.output, feed_dict=feed_dict)[0]
 
             target_value = output_value[max_action[0], max_action[1]]
 
