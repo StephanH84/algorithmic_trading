@@ -21,10 +21,14 @@ actions = tf.placeholder(tf.float32, shape=[None, 3, 3])
 # state_seq
 phi = tf.placeholder(tf.float32, shape=[None, 3, 3, 4])
 
+keep_prob = tf.placeholder(tf.float32)
+
 def define_network():
     W_conv1 = weight_variable([3, 3, 4, 16])
     b_conv1 = bias_variable([3, 3, 16])
     h_conv1 = tf.nn.relu(conv2d(phi, W_conv1) + b_conv1)
+
+    h_drop1 = tf.nn.dropout(h_conv1, keep_prob)
 
     W_conv2 = weight_variable([3, 3, 16, 32])
     b_conv2 = bias_variable([3, 3, 32])
@@ -58,12 +62,13 @@ def test_evaluate():
     phi_ = tf.transpose(board_, [0, 2, 3, 1])
 
     with tf.Session() as sess:
-        phi_ = sess.run(phi_)
+        phi_ = sess.run(phi_, feed_dict={keep_prob: 1.0})
     res = evaluate(phi_)
     return phi_
 
 
-
+test_evaluate()
+exit()
 
 output_evaluated = tf.reduce_sum(output * actions, axis=[1, 2])
 loss = tf.reduce_sum(tf.squared_difference(y, output_evaluated))
@@ -80,7 +85,7 @@ def learn(batch):
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         for episode in range(3):
-            batch_dict = {y: batch[0], phi: batch[1], actions: batch[2]}
+            batch_dict = {y: batch[0], phi: batch[1], actions: batch[2], keep_prob: 0.7}
             train_step.run(feed_dict=batch_dict)
             train_accuracy = accuracy.eval(feed_dict=batch_dict)
             print('train accuracy %g' % train_accuracy)
