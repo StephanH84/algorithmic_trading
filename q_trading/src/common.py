@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import time
 from datetime import datetime
 plt.style.use('ggplot')
 
@@ -14,6 +15,8 @@ def plot_data(data, limit=1000, name="output"):
         for point in data[:limit]:
             plt.plot(get_datetime(point[0]),point[1], 'r.')
 
-        plt.savefig("../plots/%s.png" % name)
+        datetime_string = str(datetime.now())[0:19]
+        datetime_string = datetime_string.replace(' ', '-').replace(':','-')
+        plt.savefig("../plots/%s-%s.png" % (name, datetime_string))
 
         plt.show()

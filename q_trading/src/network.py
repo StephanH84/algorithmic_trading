@@ -16,6 +16,8 @@ def bias_variable(shape):
 def conv2d(x, W):
   return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
 
+def conv1d(x, W):
+  return tf.nn.conv1d(x, W, stride=1, padding='SAME')
 
 def actions_to_matrix(action):
     matrix = np.zeros([3, 3])
@@ -23,12 +25,14 @@ def actions_to_matrix(action):
     return matrix
 
 class Network():
-    def __init__(self, state_is_terminal, step_size, alpha, gamma):
+    def __init__(self, state_is_terminal, step_size, alpha, gamma, theta, C):
         self.state_is_terminal = state_is_terminal
         self.alpha = alpha
         self.gamma = gamma
+        self.theta = theta
+        self.C = C
         self.seq_size = step_size
-        self.keep_prob_value = 0.8
+        self.keep_prob_value = 0.65
 
 
         self.time_save_weights = []
@@ -38,6 +42,7 @@ class Network():
         self.time_perform_sgd_run = []
         self.time_learn_t1 = []
         self.time_learn_run = []
+        self.time_learn_make = []
 
         self.initialize()
 
@@ -46,9 +51,8 @@ class Network():
         if self.sess is not None:
             self.sess.close()
 
-    def initialize(self, C=10):
+    def initialize(self):
         self.round_counter = 0
-        self.C = C
 
         # Define placeholders
         self.y = tf.placeholder(tf.float32, shape=[None])
@@ -60,7 +64,7 @@ class Network():
         self.keep_prob = tf.placeholder(tf.float32)
 
         # Define network
-        self.output = self.define_network(self.phi)
+        self.output = self.define_network_cnn(self.phi)
 
         output_evaluated = tf.reduce_sum(self.output * self.actions, axis=[1])
         self.loss = tf.reduce_sum(tf.squared_difference(self.y, output_evaluated))
@@ -79,10 +83,42 @@ class Network():
         self.save_weights()
 
 
+    def define_network_cnn(self, phi):
+        # Try a CNN
+        input = tf.reshape(phi, [-1, self.seq_size, 1])
+
+        self.W_conv1 = weight_variable([8, 1, 10])
+        self.b_conv1 = bias_variable([self.seq_size, 10])
+        h_conv1 = tf.nn.tanh(conv1d(input, self.W_conv1) + self.b_conv1)
+
+        self.drop1 = tf.nn.dropout(h_conv1, self.keep_prob)
+
+        self.W_conv2 = weight_variable([4, 10, 15])
+        self.b_conv2 = bias_variable([self.seq_size, 15])
+        h_conv2 = tf.nn.tanh(conv1d(input, self.W_conv2) + self.b_conv2)
+
+        self.drop2 = tf.nn.dropout(h_conv2, self.keep_prob)
+
+        hidden2 = tf.reshape(h_conv2, [-1, self.seq_size * 15])
+
+        self.Wfcn = weight_variable([self.seq_size * 15, 3])
+        self.bfcn = bias_variable([3])
+        o3 = tf.matmul(hidden2, self.Wfcn) + self.bfcn
+
+
+        hidden3 = tf.nn.relu(o3)
+
+        output = tf.nn.softmax(hidden3)
+
+        self.params = [self.W_conv1, self.b_conv1, self.W_conv2, self.b_conv2]
+        self.params.extend([self.Wfcn, self.bfcn])
+
+        return output
+
+
     def define_network(self, phi):
         # Try a fully contected NN
 
-        # Flatten:
         input_size = self.seq_size
         input = phi
 
@@ -133,6 +169,22 @@ class Network():
         t1 = time.time()
         self.time_save_weights.append(t1 - t0)
 
+
+    def slide_weights(self):
+        t0 = time.time()
+
+        self.new_target_params = []
+
+        for param, target_param in zip(self.params, self.target_params):
+            value = self.sess.run(param)
+            new_value = self.theta * value + (1 - self.theta) * target_param
+            self.new_target_params.append(value)
+
+        self.target_params = self.new_target_params
+
+        t1 = time.time()
+        self.time_save_weights.append(t1 - t0)
+
     def evaluate(self, phi, target_network=False):
         # returns the argmax action for given phi
         t0 = time.time()
@@ -169,6 +221,11 @@ class Network():
         # train_loss = self.sess.run(self.loss, feed_dict=batch_dict)
         # print('train accuracy %g, train loss %g' % (train_accuracy, train_loss))
 
+    def to_action_vector(self, action_value):
+        vect = np.zeros((3))
+        vect[action_value] = 1
+        return vect
+
     def learn(self, minibatch):
         self.round_counter += 1
 
@@ -176,29 +233,43 @@ class Network():
         y = []
         actions = []
         phi = []
-        for batch in minibatch:
-            value = self.calculate_y(batch)
-            y.append(value)
-            actions.append(actions_to_matrix(batch[1]))
-            phi.append(batch[0])
 
+        t0 = time.time()
+        for sample in minibatch:
+            # split sample in three subsamples
+            samples = []
+            for i in range(3):
+                samples.append([sample[0], sample[1][i], sample[2][i], sample[3]])
+
+            for subsample in samples:
+                action = subsample[1]
+                phi_t = subsample[0]
+
+                value = self.calculate_y(subsample)
+                y.append(value)
+                actions.append(self.to_action_vector(action))
+                phi.append(phi_t)
+
+        t1 = time.time()
+
+        self.time_learn_make.append(t1 - t0)
         self.perform_sgd(y, phi, actions)
 
-        if self.round_counter % self.C == 0:
-            self.save_weights()
+        if self.C is None or (self.round_counter % self.C == 0):
+            self.slide_weights()
 
-    def calculate_y(self, batch, DDQN=True):
+    def calculate_y(self, sample, DDQN=True):
         if DDQN:
-            return self.calculate_y_DDQN(batch)
+            return self.calculate_y_DDQN(sample)
 
         # Now additionally with Double DQN
-        if self.state_is_terminal(batch[3][-1]):
-            value = batch[2]
+        if self.state_is_terminal(sample[3][-1]):
+            value = sample[2]
         else:
             t0 = time.time()
 
             # switch to target network parameters
-            feed_dict = {self.phi: self.transformation1(batch[3]),
+            feed_dict = {self.phi: self.transformation1(sample[3]),
                          self.keep_prob: 1.0}
 
             for param, target_param in zip(self.params, self.target_params):
@@ -211,22 +282,25 @@ class Network():
             self.time_learn_run.append(t2 - t1)
             max_value = np.max(output_value)
 
-            value = batch[2] + self.gamma * max_value
+            value = sample[2] + self.gamma * max_value
         return value
 
 
-    def calculate_y_DDQN(self, batch):
+    def calculate_y_DDQN(self, sample):
         # Now additionally with Double DQN
-        if self.state_is_terminal(batch[3][-1]):
-            value = batch[2]
+
+        phi_t1 = sample[3]
+        reward = sample[2]
+
+        if self.state_is_terminal(phi_t1[-1]):
+            value = reward
         else:
             # get max_action on online network
-            feed_dict = {self.phi: self.transformation1(batch[3]), self.keep_prob: 1.0}
+            feed_dict = {self.phi: self.transformation1(phi_t1), self.keep_prob: 1.0}
 
-            action_value = self.sess.run(self.output_action, feed_dict=feed_dict)
-            max_action = self.map_action_value_to_action_vector(action_value)
+            max_action = self.sess.run(self.output_action, feed_dict=feed_dict)
 
-            feed_dict = {self.phi: self.transformation1(batch[3]),
+            feed_dict = {self.phi: self.transformation1(phi_t1),
                          self.keep_prob: 1.0}
 
             for param, target_param in zip(self.params, self.target_params):
@@ -234,15 +308,17 @@ class Network():
 
             output_value = self.sess.run(self.output, feed_dict=feed_dict)[0]
 
-            target_value = output_value[max_action[0], max_action[1]]
+            target_value = output_value[max_action]
 
-            value = batch[2] + self.gamma * target_value
+            value = reward + self.gamma * target_value
         return value
 
     def transformation1(self, phi):
         phi_np = np.asarray([phi])
-        return np.swapaxes(np.swapaxes(phi_np, 1, 2), 2, 3)
+        result = phi_np[:,:, 1]
+        return result
 
     def transformation2(self, phi):
         phi_np = np.asarray(phi)
-        return np.swapaxes(np.swapaxes(phi_np, 1, 2), 2, 3)
+        result = phi_np[:,:, 1]
+        return result

@@ -5,12 +5,19 @@ def main():
     tradingStream = TradingStream("../../data/S&P_500.csv")
     tradingEnv = TradingEnv(tradingStream, window_size=100)
     alpha = 1e-4
-    gamma = 0.5
+    gamma = 0.85
+    theta = 9*1e-4
+    C = None
+    seq_size = 100
+    N = 32
 
-    agent = DQN_Agent(tradingEnv, alpha, gamma)
+    agent = DQN_Agent(tradingEnv, alpha, gamma, theta, C, seq_size, N)
 
     runEnv = RunEnv(tradingEnv, agent)
 
-    runEnv.run()
+    # offically
+    runEnv.run(episodes=4, testing_phase=2750, training_phase=1460)
+
+    # runEnv.run(episodes=1, testing_phase=1400, training_phase=400)
 
 main()
