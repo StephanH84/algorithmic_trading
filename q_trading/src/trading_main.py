@@ -16,8 +16,8 @@ def main():
     runEnv = RunEnv(tradingEnv, agent)
 
     # offically
-    runEnv.run(episodes=4, testing_phase=2750, training_phase=1460)
+    # runEnv.run(episodes=4, testing_phase=2750, training_phase=1460)
 
-    # runEnv.run(episodes=1, testing_phase=1400, training_phase=400)
+    runEnv.run(episodes=1, testing_phase=2750, training_phase=1000)
 
 main()

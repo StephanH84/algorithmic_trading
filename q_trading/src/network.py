@@ -95,7 +95,7 @@ class Network():
 
         self.W_conv2 = weight_variable([4, 10, 15])
         self.b_conv2 = bias_variable([self.seq_size, 15])
-        h_conv2 = tf.nn.tanh(conv1d(input, self.W_conv2) + self.b_conv2)
+        h_conv2 = tf.nn.tanh(conv1d(h_conv1, self.W_conv2) + self.b_conv2)
 
         self.drop2 = tf.nn.dropout(h_conv2, self.keep_prob)
 
