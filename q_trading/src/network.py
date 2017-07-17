@@ -32,7 +32,7 @@ class Network():
         self.theta = theta
         self.C = C
         self.seq_size = step_size
-        self.keep_prob_value = 0.65
+        self.keep_prob_value = 0.8
 
 
         self.time_save_weights = []
@@ -85,37 +85,37 @@ class Network():
         self.save_weights()
 
 
-    def define_network_cnn(self, phi):
+    def define_network_cnn(self, phi, phase):
         # Try a CNN
         input = tf.reshape(phi, [-1, self.seq_size, 1])
 
         self.W_conv1 = weight_variable([8, 1, 10])
         self.b_conv1 = bias_variable([self.seq_size, 10])
-        h_conv1 = tf.nn.tanh(conv1d(input, self.W_conv1) + self.b_conv1)
+        self.h_conv1 = tf.nn.relu(conv1d(input, self.W_conv1) + self.b_conv1)
 
-        self.drop1 = tf.nn.dropout(h_conv1, self.keep_prob)
+        self.drop1 = tf.nn.dropout(self.h_conv1, self.keep_prob)
 
         self.W_conv2 = weight_variable([4, 10, 15])
         self.b_conv2 = bias_variable([self.seq_size, 15])
-        h_conv2 = tf.nn.tanh(conv1d(h_conv1, self.W_conv2) + self.b_conv2)
+        self.h_conv2 = tf.nn.relu(conv1d(self.h_conv1, self.W_conv2) + self.b_conv2)
 
-        self.drop2 = tf.nn.dropout(h_conv2, self.keep_prob)
+        self.drop2 = tf.nn.dropout(self.h_conv2, self.keep_prob)
 
-        hidden2 = tf.reshape(h_conv2, [-1, self.seq_size * 15])
+        hidden2 = tf.reshape(self.h_conv2, [-1, self.seq_size * 15])
 
         self.Wfcn = weight_variable([self.seq_size * 15, 3])
         self.bfcn = bias_variable([3])
-        o3 = tf.matmul(hidden2, self.Wfcn) + self.bfcn
+        self.o3 = tf.matmul(hidden2, self.Wfcn) + self.bfcn
 
 
-        hidden3 = tf.nn.relu(o3)
+        hidden3 = self.o3 # tf.nn.elu(self.o3)
 
-        output = tf.nn.softmax(hidden3)
+        self.output = tf.nn.softmax(hidden3)
 
         self.params = [self.W_conv1, self.b_conv1, self.W_conv2, self.b_conv2]
         self.params.extend([self.Wfcn, self.bfcn])
 
-        return output
+        return self.output
 
 
     def define_network_cnn_bn(self, phi, phase):
@@ -126,42 +126,85 @@ class Network():
 
         self.output0 = self.bn0
 
-        self.output1, self.W_conv1, self.b_conv1 = self.make_layer_1(self.output0, phase, 8, 1, 10)
+        self.output1, self.W_conv1, self.b_conv1, self.dropout1, self.bn1 = self.make_layer_1(self.output0, phase, 12, 1, 16)
 
-        self.output2, self.W_conv2, self.b_conv2 = self.make_layer_1(self.output1, phase, 4, 10, 15)
+        self.output2, self.W_conv2, self.b_conv2, self.dropout2, self.bn2 = self.make_layer_1(self.output1, phase, 8, 16, 20)
 
-        hidden2 = tf.reshape(self.output2, [-1, self.seq_size * 15])
+        self.output3, self.W_conv3, self.b_conv3, self.dropout3, self.bn3 = self.make_layer_1(self.output2, phase, 4, 20, 24)
 
-        self.Wfcn = weight_variable([self.seq_size * 15, 3])
+        output3_size = self.seq_size * 24
+        hidden2 = tf.reshape(self.output3, [-1, output3_size])
+
+        self.Wfcn = weight_variable([output3_size, 3])
         self.bfcn = bias_variable([3])
         o3 = tf.matmul(hidden2, self.Wfcn) + self.bfcn
 
+        output = tf.nn.softmax(o3)
+
+        self.params = [self.W_conv1, self.b_conv1, self.W_conv2, self.b_conv2, self.W_conv3, self.b_conv3]
+        self.params.extend([self.Wfcn, self.bfcn])
+
+        return output
+
+
+    def define_network_cnn_bn_3(self, phi, phase):
+        # Try a CNN
+        input = tf.expand_dims(phi, 2)
+
+        self.bn0 = tf.contrib.layers.batch_norm(input, center=True, scale=True, is_training=phase)
+
+        self.output0 = self.bn0
+
+        self.output1_, self.W_conv1, self.b_conv1, self.dropout1, self.bn1\
+            = self.make_layer_1(self.output0, phase, 16, 1, 16) # 9, 1, 16)
+        self.output1 = self.pooling(self.output1_)
+
+        self.output2_, self.W_conv2, self.b_conv2, self.dropout2, self.bn2 = self.make_layer_1(self.output1, phase, 8, 16, 32)
+        # 4, 16, 32) #
+        self.output2 = self.pooling(self.output2_)
+
+        self.output3_, self.W_conv3, self.b_conv3, self.dropout3, self.bn3 = self.make_layer_1(self.output2, phase, 4, 32, 64)
+        self.output3 = self.pooling(self.output3_)
+
+        output3_shape1 = int(self.output3.shape[1])
+        output3_shape2 = int(self.output3.shape[2])
+        hidden2 = tf.reshape(self.output3, [-1, output3_shape1 * output3_shape2])
+
+        self.Wfcn = weight_variable([output3_shape1 * output3_shape2, 3])
+        self.bfcn = bias_variable([3])
+        o3 = tf.matmul(hidden2, self.Wfcn) + self.bfcn
 
         hidden3 = tf.nn.relu(o3)
 
         output = tf.nn.softmax(hidden3)
 
-        self.params = [self.W_conv1, self.b_conv1, self.W_conv2, self.b_conv2]
+        self.params = [self.W_conv1, self.b_conv1, self.W_conv2, self.b_conv2] #, self.W_conv3, self.b_conv3]
         self.params.extend([self.Wfcn, self.bfcn])
 
         return output
 
     def make_layer_1(self, input, phase, conv_size, input_size, output_size):
         W_conv = weight_variable([conv_size, input_size, output_size])
-        b_conv = bias_variable([self.seq_size, output_size])
+        b_conv = bias_variable([input.shape[1], output_size])
 
         conv_ = conv1d(input, W_conv) + b_conv
         bn = tf.contrib.layers.batch_norm(conv_, center=True, scale=True, is_training=phase)
 
         h_conv = tf.nn.relu(bn)
 
-        self.drop = tf.nn.dropout(h_conv, self.keep_prob)
+        dropout = tf.nn.dropout(h_conv, self.keep_prob) # self missing
 
         output = h_conv
 
-        return output, W_conv, b_conv
+        return output, W_conv, b_conv, dropout, bn
 
-    def define_network(self, phi):
+    def pooling(self, input):
+        input4 = tf.expand_dims(input, 2)
+        output4 = tf.nn.avg_pool(input4, ksize=[1, 2, 1, 1], strides=[1, 2, 1, 1], padding='VALID')
+        output = tf.squeeze(output4, [2])
+        return output
+
+    def define_network(self, phi, phase):
         # Try a fully contected NN
 
         input_size = self.seq_size
@@ -247,7 +290,10 @@ class Network():
 
         feed_dict[self.phase] = 0
 
-        output_value = self.sess.run(self.output, feed_dict=feed_dict)[0]
+        output_value_ = self.sess.run(self.output, feed_dict=feed_dict)
+        output_value = output_value_[0]
+        print(output_value)
+
         t2 = time.time()
 
         self.time_evaluate_t1.append(t1 - t0) # Result: takes too long
@@ -265,9 +311,9 @@ class Network():
 
         self.time_perform_sgd_t1.append(t1 - t0) # Result: Takes too long
         self.time_perform_sgd_run.append(t2 - t1)
-        # train_accuracy = self.sess.run(self.accuracy, feed_dict=batch_dict)
-        # train_loss = self.sess.run(self.loss, feed_dict=batch_dict)
-        # print('train accuracy %g, train loss %g' % (train_accuracy, train_loss))
+        train_accuracy = self.sess.run(self.accuracy, feed_dict=batch_dict)
+        train_loss = self.sess.run(self.loss, feed_dict=batch_dict)
+        print('train accuracy %g, train loss %g' % (train_accuracy, train_loss))
 
     def to_action_vector(self, action_value):
         vect = np.zeros((3))
@@ -360,6 +406,7 @@ class Network():
             feed_dict[self.phase] = 0
 
             output_value = self.sess.run(self.output, feed_dict=feed_dict)[0]
+            # print(output_value)
 
             target_value = output_value[max_action]
 

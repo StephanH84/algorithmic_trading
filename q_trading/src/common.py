@@ -12,6 +12,7 @@ def plot_data(data, limit=3000, name="output"):
         "lines.markersize": 3
     }
     with plt.rc_context(classic_dashes):
+        plt.clf()
         for point in data[:limit]:
             plt.plot(get_datetime(point[0]),point[1], 'r.')
 

@@ -55,7 +55,8 @@ class TradingEnv():
 
     def intialize(self):
         self.trading_stream_gen = self.trading_stream.get_next()
-        self.pull_next_state()
+        while len(self.trading_history) < self.window_size:
+            self.pull_next_state()
 
     def pull_next_state(self):
         next_state = next(self.trading_stream_gen)
@@ -196,5 +197,7 @@ class RunEnv():
 
             if EOG:
                 break
+
+            self.agent.store(action, reward, new_state)
 
         self.env.plot_wealth()
