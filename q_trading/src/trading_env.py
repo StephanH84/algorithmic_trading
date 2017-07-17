@@ -64,23 +64,31 @@ class TradingEnv():
 
     def plot_wealth(self):
         total_profit = 0.0
+        accumulated_profit = []
+
         for date, profit in self.profits:
             total_profit += profit
+            accumulated_profit[date] = total_profit
 
         print(total_profit)
 
-        plot_data(self.profits)
+        plot_data(self.profits, name="profits")
+
+        plot_data(accumulated_profit, name="acc_profits")
+
+        plot_data(self.action_history, name="actions")
 
     def act(self, action):
-        self.action_history.append(action)
 
         EOG = False
         new_state = None
         try:
             new_state = self.pull_next_state()
+            self.action_history.append([new_state[0], action])
         except (self.__class__.StateEnv.END_OF_DATA, StopIteration):
             EOG = True
             self.EOG = EOG
+            self.action_history.append([None, action])
             return new_state, None, EOG
 
         reward = self.get_reward(self.trading_history, new_state, action)
@@ -91,8 +99,8 @@ class TradingEnv():
 
     def process_profit(self, transaction_cost=0.0):
         if self.test_phase and len(self.action_history) > 1 and len(self.trading_history) > 2:
-            previous_action = self.action_history[-2]
-            current_action = self.action_history[-1]
+            previous_action = self.action_history[-2][1]
+            current_action = self.action_history[-1][1]
 
             previous_state = self.trading_history[-2]
             current_state = self.trading_history[-1]

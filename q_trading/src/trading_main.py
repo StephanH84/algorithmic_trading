@@ -6,10 +6,10 @@ def main():
     tradingEnv = TradingEnv(tradingStream, window_size=100)
     alpha = 1e-4
     gamma = 0.85
-    theta = 9*1e-4
+    theta = 3*1e-4
     C = None
     seq_size = 100
-    N = 32
+    N = 64
 
     agent = DQN_Agent(tradingEnv, alpha, gamma, theta, C, seq_size, N)
 
@@ -18,6 +18,6 @@ def main():
     # offically
     # runEnv.run(episodes=4, testing_phase=2750, training_phase=1460)
 
-    runEnv.run(episodes=1, testing_phase=2750, training_phase=1000)
+    runEnv.run(episodes=1, testing_phase=2750, training_phase=1460)
 
 main()

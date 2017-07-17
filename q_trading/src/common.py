@@ -7,7 +7,7 @@ def get_datetime(str_, format="%d.%m.%Y"):
     result = datetime.strptime(str_, format)
     return result
 
-def plot_data(data, limit=1000, name="output"):
+def plot_data(data, limit=3000, name="output"):
     classic_dashes = {
         "lines.markersize": 3
     }
