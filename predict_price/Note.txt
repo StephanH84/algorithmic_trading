@@ -1,0 +1,1 @@
+Goal of this unit of code is to achieve a lookahead (prediction) of a few days on stock market data.
