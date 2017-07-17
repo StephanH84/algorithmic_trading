@@ -32,7 +32,7 @@ class Network():
         self.theta = theta
         self.C = C
         self.seq_size = step_size
-        self.keep_prob_value = 0.8
+        self.keep_prob_value = 0.9
 
 
         self.time_save_weights = []
@@ -311,9 +311,10 @@ class Network():
 
         self.time_perform_sgd_t1.append(t1 - t0) # Result: Takes too long
         self.time_perform_sgd_run.append(t2 - t1)
-        train_accuracy = self.sess.run(self.accuracy, feed_dict=batch_dict)
+        # train_accuracy = self.sess.run(self.accuracy, feed_dict=batch_dict)
         train_loss = self.sess.run(self.loss, feed_dict=batch_dict)
-        print('train accuracy %g, train loss %g' % (train_accuracy, train_loss))
+        print('train loss %g' % train_loss)
+        # print('train accuracy %g, train loss %g' % (train_accuracy, train_loss))
 
     def to_action_vector(self, action_value):
         vect = np.zeros((3))

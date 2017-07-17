@@ -20,6 +20,6 @@ def main():
 
     # runEnv.run(episodes=1, testing_phase=1500, training_phase=2500)
 
-    runEnv.run(episodes=1, testing_phase=2750, training_phase=800)
+    runEnv.run(episodes=1, testing_phase=2750, training_phase=1400)
 
 main()
