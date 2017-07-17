@@ -68,7 +68,7 @@ class TradingEnv():
 
         for date, profit in self.profits:
             total_profit += profit
-            accumulated_profit[date] = total_profit
+            accumulated_profit.append([date, total_profit])
 
         print(total_profit)
 
@@ -170,6 +170,9 @@ class RunEnv():
 
         for e in range(episodes):
             self.env.intialize()
+            if e > 0:
+                pass # TODO something like self.env.reset_history()
+
             # training phase
             for n in range(training_phase):
 
@@ -187,7 +190,7 @@ class RunEnv():
         self.env.enable_test_phase()
 
         for n in range(testing_phase):
-            action = self.agent.turn(self.env.trading_history[-1])
+            action = self.agent.turn(self.env.trading_history[-1], dontExplore=True)
 
             new_state, reward, EOG = self.env.act(action)
 

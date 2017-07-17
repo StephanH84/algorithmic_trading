@@ -126,25 +126,11 @@ class Network():
 
         self.output0 = self.bn0
 
-        self.W_conv1 = weight_variable([8, 1, 10])
-        self.b_conv1 = bias_variable([self.seq_size, 10])
-        h_conv1 = tf.nn.tanh(conv1d(self.output0, self.W_conv1) + self.b_conv1)
+        self.output1, self.W_conv1, self.b_conv1 = self.make_layer_1(self.output0, phase, 8, 1, 10)
 
-        self.drop1 = tf.nn.dropout(h_conv1, self.keep_prob)
+        self.output2, self.W_conv2, self.b_conv2 = self.make_layer_1(self.output1, phase, 4, 10, 15)
 
-        self.bn1 = tf.contrib.layers.batch_norm(h_conv1, center=True, scale=True, is_training=phase)
-
-        self.output1 = self.bn1
-
-        self.W_conv2 = weight_variable([4, 10, 15])
-        self.b_conv2 = bias_variable([self.seq_size, 15])
-        h_conv2 = tf.nn.tanh(conv1d(self.output1, self.W_conv2) + self.b_conv2)
-
-        self.drop2 = tf.nn.dropout(h_conv2, self.keep_prob)
-
-        self.bn2 = tf.contrib.layers.batch_norm(h_conv2, center=True, scale=True, is_training=phase)
-
-        hidden2 = tf.reshape(h_conv2, [-1, self.seq_size * 15])
+        hidden2 = tf.reshape(self.output2, [-1, self.seq_size * 15])
 
         self.Wfcn = weight_variable([self.seq_size * 15, 3])
         self.bfcn = bias_variable([3])
@@ -160,6 +146,20 @@ class Network():
 
         return output
 
+    def make_layer_1(self, input, phase, conv_size, input_size, output_size):
+        W_conv = weight_variable([conv_size, input_size, output_size])
+        b_conv = bias_variable([self.seq_size, output_size])
+
+        conv_ = conv1d(input, W_conv) + b_conv
+        bn = tf.contrib.layers.batch_norm(conv_, center=True, scale=True, is_training=phase)
+
+        h_conv = tf.nn.relu(bn)
+
+        self.drop = tf.nn.dropout(h_conv, self.keep_prob)
+
+        output = h_conv
+
+        return output, W_conv, b_conv
 
     def define_network(self, phi):
         # Try a fully contected NN

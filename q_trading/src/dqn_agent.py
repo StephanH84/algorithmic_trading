@@ -13,25 +13,30 @@ class DQN_Agent():
         self.learn_time_random = []
 
 
-    def turn(self, state, eps=0.1):
-        rnd = random.uniform(0, 1)
-
+    def turn(self, state, eps=0.1, dontExplore=False):
         def explore(self):
             return random.randint(-1, 1)
 
-        if rnd < eps:
-            # explore
-            a = explore(state)
+        if dontExplore:
+            a = self.exploit(explore, state)
         else:
-            # exploit
-            action_value, success = self.get_action(state)
-
-            if not success:
+            rnd = random.uniform(0, 1)
+            if rnd < eps:
+                # explore
                 a = explore(state)
             else:
-                a = np.argmax(np.asarray(action_value)) - 1
+                a = self.exploit(explore, state)
 
         self.action = a
+        return a
+
+    def exploit(self, explore, state):
+        # exploit
+        action_value, success = self.get_action(state)
+        if not success:
+            a = explore(state)
+        else:
+            a = np.argmax(np.asarray(action_value)) - 1
         return a
 
     def update_special(self, actions, rewards, new_state):
