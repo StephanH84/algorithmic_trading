@@ -1,6 +1,7 @@
-from q_learning.src.game import TicTacToe, RunRL
-from q_learning.src.q_learning_agent import Agent as PreciseAgent
 from agent import Agent
+from q_learning.src.game import TicTacToe, RunRL
+
+from TicTacToe.q_learning.src.q_learning_agent import Agent as PreciseAgent
 
 
 def main():

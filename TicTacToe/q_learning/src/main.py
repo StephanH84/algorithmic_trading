@@ -1,5 +1,6 @@
 from game import TicTacToe, RunRL
-from q_learning.src import Agent
+
+from TicTacToe.q_learning import Agent
 
 
 def main():
