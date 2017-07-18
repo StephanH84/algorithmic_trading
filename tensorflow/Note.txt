@@ -1,0 +1,7 @@
+See http://ci.tensorflow.org/view/Nightly/ for more or less 100% working version for Windows.
+
+https://ci.tensorflow.org/view/Nightly/job/nightly-win/M=windows-gpu,PY=35/
+
+I created a issue on Tensorflow Github issue tracker for solving the "import tensorflow" problem:
+https://github.com/tensorflow/tensorflow/issues/11571
+
