@@ -20,4 +20,4 @@ def plot_data(data, limit=3000, name="output"):
         datetime_string = datetime_string.replace(' ', '-').replace(':','-')
         plt.savefig("../plots/%s-%s.png" % (name, datetime_string))
 
-        plt.show()
+        # plt.show()

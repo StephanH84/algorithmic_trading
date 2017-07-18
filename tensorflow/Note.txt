@@ -2,4 +2,6 @@ See http://ci.tensorflow.org/view/Nightly/ for more or less 100% working version
 
 https://ci.tensorflow.org/view/Nightly/job/nightly-win/M=windows-gpu,PY=35/
 
-https://stackoverflow.com/questions/42011070/on-windows-running-import-tensorflow-generates-no-module-named-pywrap-tenso
+I created a issue on Tensorflow Github issue tracker for solving the "import tensorflow" problem:
+https://github.com/tensorflow/tensorflow/issues/11571
+
