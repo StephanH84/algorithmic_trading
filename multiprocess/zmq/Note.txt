@@ -1,0 +1,5 @@
+https://pyzmq.readthedocs.io/en/latest/
+
+http://zeromq.org/bindings:python
+
+http://zguide.zeromq.org/py:all
