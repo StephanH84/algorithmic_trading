@@ -1,14 +1,17 @@
-from q_trading.src.network import Network
 import random
 import time
+
 import numpy as np
 
+from AT.q_trading.src.network import Network
+
+
 class DQN_Agent():
-    def __init__(self, env, alpha, gamma, theta, C, seq_size, N):
+    def __init__(self, env, alpha, gamma, theta, C, seq_size, N, beta):
         self.replay_memory = []
         self.history = []
         self.seq_size = seq_size
-        self.network = Network(env.state_is_terminal, self.seq_size, alpha, gamma, theta, C)
+        self.network = Network(env.state_is_terminal, self.seq_size, alpha, gamma, theta, C, beta)
         self.N = N # mini-batch size
         self.learn_time_random = []
 

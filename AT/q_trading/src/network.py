@@ -25,9 +25,10 @@ def actions_to_matrix(action):
     return matrix
 
 class Network():
-    def __init__(self, state_is_terminal, step_size, alpha, gamma, theta, C):
+    def __init__(self, state_is_terminal, step_size, alpha, gamma, theta, C, beta):
         self.state_is_terminal = state_is_terminal
         self.alpha = alpha
+        self.beta = beta
         self.gamma = gamma
         self.theta = theta
         self.C = C
@@ -70,6 +71,9 @@ class Network():
 
         output_evaluated = tf.reduce_sum(self.output * self.actions, axis=[1])
         self.loss = tf.reduce_sum(tf.squared_difference(self.y, output_evaluated))
+        # add entropy term
+        self.loss_entropy = self.beta * tf.reduce_sum(-self.output * tf.log(self.output))
+        self.loss += self.loss_entropy
 
         self.train_step = tf.train.AdamOptimizer(self.alpha).minimize(self.loss)
 
@@ -313,7 +317,9 @@ class Network():
         self.time_perform_sgd_run.append(t2 - t1)
         # train_accuracy = self.sess.run(self.accuracy, feed_dict=batch_dict)
         train_loss = self.sess.run(self.loss, feed_dict=batch_dict)
-        print('train loss %g' % train_loss)
+        loss_entropy = self.sess.run(self.loss_entropy, feed_dict=batch_dict)
+
+        print('train loss %g, loss entropy %g' % (train_loss, loss_entropy))
         # print('train accuracy %g, train loss %g' % (train_accuracy, train_loss))
 
     def to_action_vector(self, action_value):
