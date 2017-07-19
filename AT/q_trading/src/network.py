@@ -72,8 +72,11 @@ class Network():
         output_evaluated = tf.reduce_sum(self.output * self.actions, axis=[1])
         self.loss = tf.reduce_sum(tf.squared_difference(self.y, output_evaluated))
         # add entropy term
-        self.loss_entropy = self.beta * tf.reduce_sum(-self.output * tf.log(self.output))
-        self.loss += self.loss_entropy
+        if self.beta is None:
+            self.loss_entropy = bias_variable([1])
+        else:
+            self.loss_entropy = self.beta * tf.reduce_sum(-self.output * tf.log(self.output))
+            self.loss += self.loss_entropy
 
         self.train_step = tf.train.AdamOptimizer(self.alpha).minimize(self.loss)
 

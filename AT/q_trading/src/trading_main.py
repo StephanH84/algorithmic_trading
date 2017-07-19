@@ -9,8 +9,8 @@ def main():
     theta = 3*1e-4
     C = None
     seq_size = 100
-    N = 55
-    beta = 80
+    N = 64
+    beta = None
 
     agent = DQN_Agent(tradingEnv, alpha, gamma, theta, C, seq_size, N, beta)
 
@@ -21,6 +21,6 @@ def main():
 
     # runEnv.run(episodes=1, testing_phase=1500, training_phase=2500)
 
-    runEnv.run(episodes=1, testing_phase=1500, training_phase=1500)
+    runEnv.run(episodes=1, testing_phase=1500, training_phase=500)
 
 main()
