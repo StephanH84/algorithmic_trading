@@ -35,13 +35,34 @@ class Worker():
         print("event loop")
         # Currently for data channel
         while True:
+            # PULL section
+            cls.send_data("PULL")
+            OK_received = False
+            while not OK_received:
+                fromServer = cls.socket.recv(10)
+                if fromServer == b'OK':
+                    print("OK(PULL) received")
+                    OK_received = True
+                    data_received = cls.socket.recv(1024)
+                    print("data_received: %s" % data_received)
+
+            # Computational section, modelled as time.sleep(10)
+            time.sleep(2)
             data = cls.generate_data()
-            # print(data)
-            cls.send_data(data)
+
+            # PUSH section
+            cls.send_data("PUSH")
+            OK_received = False
+            while not OK_received:
+                fromServer = cls.socket.recv(10)
+                if fromServer == b'OK':
+                    print("OK(PUSH) received")
+                    OK_received = True
+                    cls.send_data(data)
 
     @staticmethod
     def generate_data():
-        return json.dumps([random.randint(0,1) for n in range(20)])
+        return json.dumps([random.randint(0, 10) for n in range(1)])
 
     @classmethod
     def send_data(cls, data):

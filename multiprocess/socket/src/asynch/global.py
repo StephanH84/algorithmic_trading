@@ -3,6 +3,13 @@ from multiprocess.socket.src.asynch.worker import Worker, thread as worker_threa
 import multiprocessing as mp
 import psutil
 import time
+import json
+
+def encode_bytes(txt):
+    return bytes(txt.encode('utf8'))
+
+def decode_bytes(byt):
+    return str(byt.decode('utf8'))
 
 class GlobalState():
     BEGINNING = 1
@@ -12,7 +19,7 @@ class GlobalProcess():
     def __init__(self):
         self.internal_state = GlobalState.BEGINNING
 
-        self.initialize(1)
+        self.initialize(3)
 
     def run(self):
         self.event_loop()
@@ -29,7 +36,7 @@ class GlobalProcess():
     def event_loop(self):
         while True:
             for sock, conn, addr in self.procs:
-                time.sleep(0.01)
+                time.sleep(0.3)
                 try:
                     data = conn.recv(128)
                 except:
@@ -39,14 +46,29 @@ class GlobalProcess():
                 if data:
                     print("from: %s -- Data received Received: %s" % (addr[1], data))
 
-                if data == "PUSH":
-                    conn.sendall("OK")
-                    data = conn.recv(2048)
-                    self.data_storage.append([addr[1], data])
+                if data == b'PUSH': # PUSH COMMAND RECEIVED: getting data
+                    print("PUSH received")
+                    conn.sendall(b'OK')
+                    t0 = time.time()
+                    while True:
+                        try:
+                            data = conn.recv(2048)
+                            break
+                        except BlockingIOError:
+                            t1 = time.time()
+                            if t1 - t0 > 1:
+                                data = None
+                                break
+                            pass
 
-                elif data == "PULL":
-                    conn.sendall("OK")
-                    conn.sendall("")
+                    if data is not None:
+                        data_decode = decode_bytes(data)
+                        self.data_storage.append([addr[1], data_decode])
+
+                elif data == b'PULL':
+                    print("PULL received")
+                    conn.sendall(b'OK')
+                    conn.sendall(encode_bytes(json.dumps(self.data_storage)))
 
 
     def initialize(self, N):
