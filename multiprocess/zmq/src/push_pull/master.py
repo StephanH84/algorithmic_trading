@@ -1,7 +1,6 @@
 import multiprocessing as mp
 import psutil
 from multiprocess.zmq.src.push_pull.tasksink import sink, bind as sink_bind
-from multiprocess.zmq.src.push_pull.taskvent import vent
 from multiprocess.zmq.src.push_pull.taskwork import work, bind as work_bind
 
 def spawn():

@@ -16,36 +16,38 @@ except NameError:
 
 context = zmq.Context()
 
+port_a = 1
+port_b = 2
 # Socket to send messages on
 sender = context.socket(zmq.PUSH)
-sender.bind("tcp://*:5557")
+sender.bind("tcp://*:%s" % port_b)
 
 # Socket with direct access to the sink: used to syncronize start of batch
 sink = context.socket(zmq.PUSH)
-sink.connect("tcp://localhost:5556")
+sink.connect("tcp://localhost:%s" % port_a)
 
-def vent():
-    print("Press Enter when the workers are ready: ")
-    _ = raw_input()
-    print("Sending tasks to workers...")
 
-    # The first message is "0" and signals start of batch
-    sink.send(b'0')
+print("Press Enter when the workers are ready: ")
+_ = raw_input()
+print("Sending tasks to workers...")
 
-    # Initialize random number generator
-    random.seed()
+# The first message is "0" and signals start of batch
+sink.send(b'0')
 
-    # Send 100 tasks
-    total_msec = 0
-    for task_nbr in range(100):
+# Initialize random number generator
+random.seed()
 
-        # Random workload from 1 to 100 msecs
-        workload = random.randint(1, 100)
-        total_msec += workload
+# Send 100 tasks
+total_msec = 0
+for task_nbr in range(100):
 
-        sender.send_string(u'%i' % workload)
+    # Random workload from 1 to 100 msecs
+    workload = random.randint(1, 100)
+    total_msec += workload
 
-    print("Total expected cost: %s msec" % total_msec)
+    sender.send_string(u'%i' % workload)
 
-    # Give 0MQ time to deliver
-    time.sleep(1)
+print("Total expected cost: %s msec" % total_msec)
+
+# Give 0MQ time to deliver
+time.sleep(1)
