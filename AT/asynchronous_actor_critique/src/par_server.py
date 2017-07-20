@@ -6,7 +6,8 @@ import time
 import psutil
 
 from asynch.common import encode_bytes, decode_bytes, MAX_SIZE
-from AT.asynchronous_actor_critique.src.agent import Worker, thread as worker_thread
+from AT.asynchronous_actor_critique.src.agent import Agent, thread as worker_thread
+import numpy as np
 
 
 class GlobalState():
@@ -14,8 +15,18 @@ class GlobalState():
 
 class ParameterServer():
     # The parameter server and spawning all other threads
-    def __init__(self):
+    def __init__(self, alpha, eta):
+        self.alpha = alpha
+        self.eta = eta
         self.internal_state = GlobalState.BEGINNING
+
+        self.weights_common = np.array()
+        self.weights_policy = np.array()
+        self.weights_value = np.array()
+
+        self.g_common = np.array()
+        self.g_policy = np.array()
+        self.g_value = np.array()
 
         self.initialize(2)
 
@@ -103,7 +114,7 @@ class ParameterServer():
             host, port = "localhost", port
 
             # start a worker thread with parameter the socket port
-            w = Worker()
+            w = Agent()
             d = {'host': host, 'port': port, 'cls': w.__class__, 'affinity': n}
             p = mp.Process(target=worker_thread, kwargs=d)
             p.start()
@@ -120,6 +131,32 @@ class ParameterServer():
             self.procs.append([sock, conn, addr])
 
             port += 1
+
+    def initialize_weights(self, shapes):
+        self.weights_common = np.array()
+        self.weights_policy = np.array()
+        self.weights_value = np.array()
+
+        self.g_common = np.array()
+        self.g_policy = np.array()
+        self.g_value = np.array()
+
+
+    def update_weights(self, gradients, eps=1e-6):
+        # Perform stochastic gradient descent
+        # e.g. RMSProb of gradients with shared statistics
+        policy_gradients, value_gradients, common_gradients = gradients
+
+        self.g_policy = self.alpha * self.g_policy + (1 - self.alpha) * policy_gradients**2
+        self.weights_policy -= self.eta * policy_gradients / np.sqrt(self.g_policy + eps)
+
+        self.g_policy = self.alpha * self.g_policy + (1 - self.alpha) * policy_gradients**2
+        self.weights_policy -= self.eta * policy_gradients / np.sqrt(self.g_policy + eps)
+
+
+        self.g_policy = self.alpha * self.g_policy + (1 - self.alpha) * policy_gradients**2
+        self.weights_policy -= self.eta * policy_gradients / np.sqrt(self.g_policy + eps)
+
 
 def main():
     g = ParameterServer()

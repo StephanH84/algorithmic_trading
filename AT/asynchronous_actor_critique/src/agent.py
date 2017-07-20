@@ -25,7 +25,7 @@ def thread(cls, host, port, affinity):
     cls.event_loop()
 
 
-class Worker():
+class Agent():
     @classmethod
     def __init__(cls):
         cls.network = Network()
@@ -154,20 +154,22 @@ class Worker():
 
 
         if wasTerminal:
-            R = 0
+            R_tp1 = 0
         else:
-            R = cls.network.evaluate_value(state[t+1])
+            R_tp1 = cls.network.evaluate_value(state[t+1])
 
-        cls.network.initialize_gradients()
+        R = {}
+        for i in range(t, t_start + 1, -1):
+            R[i] = rewards[i] + cls.gamma * R[i + 1]
 
-        for i in range(t, t_start + 1):
-            R = rewards[i] + cls.gamma * R
 
-            # accumulate gradients wrt. to
-            cls.network.acc_gradients_p(actions[i], states[i])
+        # calculate accumulated gradients
+        state_batch = [state for state in states]
+        action_batch = [action for action in actions]
+        R_batch = [R_ for R_ in R]
 
-            cls.network.acc_gradients_v(states[i])
+        gradients = cls.network.calc_gradients(states, actions, R)
 
-        cls.push_gradients(cls.network.get_gradients())
+        cls.push_gradients(gradients)
 
         cls.handle_T(local_T)
