@@ -33,7 +33,7 @@ class Network():
         self.theta = theta
         self.C = C
         self.seq_size = step_size
-        self.keep_prob_value = 0.9
+        self.keep_prob_value = 0.95
 
 
         self.time_save_weights = []

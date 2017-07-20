@@ -16,7 +16,7 @@ class DQN_Agent():
         self.learn_time_random = []
 
 
-    def turn(self, state, eps=0.1, dontExplore=False):
+    def turn(self, state, eps=0.05, dontExplore=False):
         def explore(self):
             return random.randint(-1, 1)
 
