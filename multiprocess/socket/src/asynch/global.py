@@ -1,15 +1,13 @@
-import socket
-from multiprocess.socket.src.asynch.worker import Worker, thread as worker_thread
-import multiprocessing as mp
-import psutil
-import time
 import json
+import multiprocessing as mp
+import socket
+import time
 
-def encode_bytes(txt):
-    return bytes(txt.encode('utf8'))
+import psutil
 
-def decode_bytes(byt):
-    return str(byt.decode('utf8'))
+from asynch.common import encode_bytes, decode_bytes, MAX_SIZE
+from multiprocess.socket.src.asynch.worker import Worker, thread as worker_thread
+
 
 class GlobalState():
     BEGINNING = 1
@@ -19,7 +17,7 @@ class GlobalProcess():
     def __init__(self):
         self.internal_state = GlobalState.BEGINNING
 
-        self.initialize(3)
+        self.initialize(2)
 
     def run(self):
         self.event_loop()
@@ -49,27 +47,37 @@ class GlobalProcess():
                 if data == b'PUSH': # PUSH COMMAND RECEIVED: getting data
                     print("PUSH received")
                     conn.sendall(b'OK')
-                    t0 = time.time()
-                    while True:
-                        try:
-                            data = conn.recv(2048)
-                            break
-                        except BlockingIOError:
-                            t1 = time.time()
-                            if t1 - t0 > 1:
-                                data = None
-                                break
-                            pass
+                    content_length = self.receive(conn, 20)
+                    content_length_int = int(content_length)
+                    data = self.receive(conn, content_length_int)
 
                     if data is not None:
                         data_decode = decode_bytes(data)
                         self.data_storage.append([addr[1], data_decode])
 
+                    conn.sendall(b'PUSH_END')
+
                 elif data == b'PULL':
                     print("PULL received")
-                    conn.sendall(b'OK')
-                    conn.sendall(encode_bytes(json.dumps(self.data_storage)))
+                    bytes_to_send = encode_bytes(json.dumps(self.data_storage))
+                    bytes_to_send_size = encode_bytes(str(len(bytes_to_send)))
+                    bytes_to_send_size = b'0' * (MAX_SIZE - len(bytes_to_send_size)) + bytes_to_send_size
+                    conn.sendall(b'OK' + bytes_to_send_size)
+                    conn.sendall(bytes_to_send)
 
+    def receive(self, conn, content_length_int):
+        t0 = time.time()
+        while True:
+            try:
+                data = conn.recv(content_length_int)
+                break
+            except BlockingIOError:
+                t1 = time.time()
+                if t1 - t0 > 1:
+                    data = None
+                    break
+                pass
+        return data
 
     def initialize(self, N):
         self.data_storage = []

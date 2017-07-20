@@ -1,8 +1,12 @@
-import socket
-import random
-import time
 import json
+import random
+import socket
+import time
+
 import psutil
+
+from asynch.common import encode_bytes, MAX_SIZE
+
 
 def thread(cls, host, port, affinity):
     print("Start thread for port: %s, host: %s" % (host, port))
@@ -39,16 +43,20 @@ class Worker():
             cls.send_data("PULL")
             OK_received = False
             while not OK_received:
-                fromServer = cls.socket.recv(10)
-                if fromServer == b'OK':
+                fromServer = bytes(cls.socket.recv(22))
+                if fromServer.startswith(b'OK'):
                     print("OK(PULL) received")
                     OK_received = True
-                    data_received = cls.socket.recv(1024)
-                    print("data_received: %s" % data_received)
+
+                    content_length = fromServer.lstrip(b'OK')
+                    print("content_length: %s" % content_length)
+                    content_length_int = int(content_length)
+                    data_received = cls.socket.recv(content_length_int)
+                    print("data_received: %s, length: %s" % (data_received, len(data_received)))
 
             # Computational section, modelled as time.sleep(10)
             time.sleep(2)
-            data = cls.generate_data()
+            data = cls.computational_section()
 
             # PUSH section
             cls.send_data("PUSH")
@@ -58,7 +66,16 @@ class Worker():
                 if fromServer == b'OK':
                     print("OK(PUSH) received")
                     OK_received = True
+                    bytes_to_send = encode_bytes(data)
+                    bytes_to_send_size = encode_bytes(str(len(bytes_to_send)))
+                    bytes_to_send_size = b'0' * (MAX_SIZE - len(bytes_to_send_size)) + bytes_to_send_size
+                    cls.socket.sendall(bytes_to_send_size)
                     cls.send_data(data)
+
+    @classmethod
+    def computational_section(cls):
+        data = cls.generate_data()
+        return data
 
     @staticmethod
     def generate_data():
@@ -66,7 +83,7 @@ class Worker():
 
     @classmethod
     def send_data(cls, data):
-        cls.socket.sendall(bytes(data.encode('utf8')))
-        print("Data sent")
+        cls.socket.sendall(encode_bytes(data))
+        print("Data sent: %s" % data)
         # data = cls.socket.recv(1024)
         # print('Received', repr(data))
