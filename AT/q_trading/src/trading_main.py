@@ -8,18 +8,20 @@ def main():
     gamma = 0.85
     theta = 3*1e-4
     C = None
-    seq_size = 100
+    seq_size = 200
     N = 64
-    beta = 0.01
+    beta = 0.1
+    T_max = 1000
+    activation = "tanh"
 
-    agent = DQN_Agent(tradingEnv, alpha, gamma, theta, C, seq_size, N, beta)
+    agent = DQN_Agent(tradingEnv, alpha, gamma, theta, C, seq_size, N, beta, T_max, activation)
 
     runEnv = RunEnv(tradingEnv, agent)
 
     # officially
     # runEnv.run(episodes=4, testing_phase=2750, training_phase=1460)
 
-    runEnv.run(episodes=1, testing_phase=2750, training_phase=1460)
+    runEnv.run(episodes=2, testing_phase=2750, training_phase=1460)
 
     # runEnv.run(episodes=1, testing_phase=1500, training_phase=2500)
 

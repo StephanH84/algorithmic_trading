@@ -25,7 +25,7 @@ def actions_to_matrix(action):
     return matrix
 
 class Network():
-    def __init__(self, state_is_terminal, step_size, alpha, gamma, theta, C, beta):
+    def __init__(self, state_is_terminal, step_size, alpha, gamma, theta, C, beta, activation):
         self.state_is_terminal = state_is_terminal
         self.alpha = alpha
         self.beta = beta
@@ -45,14 +45,18 @@ class Network():
         self.time_learn_run = []
         self.time_learn_make = []
 
-        self.initialize()
+        if activation == "tanh":
+            activation_fn = tf.nn.tanh
+        else:
+            activation_fn = tf.nn.relu
+        self.initialize(activation_fn)
 
 
     def __del__(self):
         if self.sess is not None:
             self.sess.close()
 
-    def initialize(self):
+    def initialize(self, activation):
         self.round_counter = 0
 
         # Define placeholders
@@ -67,7 +71,7 @@ class Network():
         self.phase = tf.placeholder(tf.bool)
 
         # Define network
-        self.output = self.define_network_cnn_bn(self.phi, self.phase)
+        self.output = self.define_network_cnn_bn(self.phi, self.phase, activation)
 
         output_evaluated = tf.reduce_sum(self.output * self.actions, axis=[1])
         self.loss = tf.reduce_sum(tf.squared_difference(self.y, output_evaluated))
@@ -125,7 +129,7 @@ class Network():
         return self.output
 
 
-    def define_network_cnn_bn(self, phi, phase):
+    def define_network_cnn_bn(self, phi, phase, activation):
         # Try a CNN
         input = tf.reshape(phi, [-1, self.seq_size, 1])
 
@@ -133,11 +137,11 @@ class Network():
 
         self.output0 = self.bn0
 
-        self.output1, self.W_conv1, self.b_conv1, self.dropout1, self.bn1 = self.make_layer_1(self.output0, phase, 12, 1, 16)
+        self.output1, self.W_conv1, self.b_conv1, self.dropout1, self.bn1 = self.make_layer_1(self.output0, phase, 12, 1, 16, activation)
 
-        self.output2, self.W_conv2, self.b_conv2, self.dropout2, self.bn2 = self.make_layer_1(self.output1, phase, 8, 16, 20)
+        self.output2, self.W_conv2, self.b_conv2, self.dropout2, self.bn2 = self.make_layer_1(self.output1, phase, 8, 16, 20, activation)
 
-        self.output3, self.W_conv3, self.b_conv3, self.dropout3, self.bn3 = self.make_layer_1(self.output2, phase, 4, 20, 24)
+        self.output3, self.W_conv3, self.b_conv3, self.dropout3, self.bn3 = self.make_layer_1(self.output2, phase, 4, 20, 24, activation)
 
         output3_size = self.seq_size * 24
         hidden2 = tf.reshape(self.output3, [-1, output3_size])
@@ -190,14 +194,14 @@ class Network():
 
         return output
 
-    def make_layer_1(self, input, phase, conv_size, input_size, output_size):
+    def make_layer_1(self, input, phase, conv_size, input_size, output_size, activation):
         W_conv = weight_variable([conv_size, input_size, output_size])
         b_conv = bias_variable([input.shape[1], output_size])
 
         conv_ = conv1d(input, W_conv) + b_conv
         bn = tf.contrib.layers.batch_norm(conv_, center=True, scale=True, is_training=phase)
 
-        h_conv = tf.nn.relu(bn)
+        h_conv = activation(bn)
 
         dropout = tf.nn.dropout(h_conv, self.keep_prob) # self missing
 
@@ -330,7 +334,7 @@ class Network():
         vect[action_value] = 1
         return vect
 
-    def learn(self, minibatch):
+    def learn(self, minibatch, no_subsample=False):
         self.round_counter += 1
 
         # calculate output vector for stored weights (see save_weights):
@@ -342,8 +346,11 @@ class Network():
         for sample in minibatch:
             # split sample in three subsamples
             samples = []
-            for i in range(3):
-                samples.append([sample[0], sample[1][i], sample[2][i], sample[3]])
+            if not no_subsample:
+                for i in range(3):
+                    samples.append([sample[0], sample[1][i], sample[2][i], sample[3]])
+            else:
+                samples = [sample]
 
             for subsample in samples:
                 action = subsample[1]

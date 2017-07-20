@@ -152,6 +152,21 @@ class TradingEnv():
 
         return actions, rewards, new_state, EOG
 
+    def get_reward_for_action(self, action):
+        # pull new state
+        EOG = False
+        new_state = None
+        try:
+            new_state = self.pull_next_state()
+        except (self.__class__.StateEnv.END_OF_DATA, StopIteration):
+            EOG = True
+            self.EOG = EOG
+            return None, new_state, EOG
+
+        reward = self.get_reward(self.trading_history, new_state, action)
+
+        return reward, new_state, EOG
+
     def enable_test_phase(self):
         self.test_phase = True
 
@@ -166,7 +181,7 @@ class RunEnv():
         self.env = env
         self.agent = agent
 
-    def run(self, episodes, testing_phase, training_phase):
+    def run_old(self, episodes, testing_phase, training_phase):
 
 
         for e in range(episodes):
@@ -195,6 +210,48 @@ class RunEnv():
 
             new_state, reward, EOG = self.env.act(action)
 
+            if EOG:
+                break
+
+            self.agent.store(action, reward, new_state)
+
+        self.env.plot_wealth()
+
+
+    def run(self, episodes, testing_phase, training_phase):
+
+
+        for e in range(episodes):
+            self.env.intialize()
+            if e > 0:
+                pass # TODO something like self.env.reset_history()
+
+            # training phase
+            for n in range(training_phase):
+
+                action = self.agent.turn(self.env.trading_history[-1])
+
+                if n % 2 == 0:
+                    print("Epsiode: %s, Day: %s" % (e, n))
+
+                reward, new_state, EOG = self.env.get_reward_for_action(action)
+
+                print("new_state: %s" % new_state)
+
+                if EOG:
+                    break
+
+                self.agent.update(reward, new_state, no_subsample=True)
+
+        # testing phase, i.e. no updates
+        self.env.enable_test_phase()
+
+        for n in range(testing_phase):
+            action = self.agent.turn(self.env.trading_history[-1], dontExplore=True)
+
+            new_state, reward, EOG = self.env.act(action)
+
+            print("new_state: %s" % new_state)
             if EOG:
                 break
 

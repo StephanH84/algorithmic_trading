@@ -27,9 +27,10 @@ def thread(cls, host, port, affinity):
 
 class Agent():
     @classmethod
-    def __init__(cls):
+    def __init__(cls, t_max=5):
         cls.network = Network()
         cls.tradingEnv = TradingEnv()
+        cls.t_max = t_max
 
     @classmethod
     def __del__(cls):
@@ -48,40 +49,55 @@ class Agent():
     @classmethod
     def event_loop(cls):
         print("event loop")
-        # Currently for data channel
+        t = 1
         while True:
             # PULL section
-            cls.send_data("PULL")
-            OK_received = False
-            while not OK_received:
-                fromServer = bytes(cls.socket.recv(22))
-                if fromServer.startswith(b'OK'):
-                    print("OK(PULL) received")
-                    OK_received = True
+            weights =cls.pull_from_server()
 
-                    content_length = fromServer.lstrip(b'OK')
-                    print("content_length: %s" % content_length)
-                    content_length_int = int(content_length)
-                    data_received = cls.socket.recv(content_length_int)
-                    print("data_received: %s, length: %s" % (data_received, len(data_received)))
-
-            # Computational section, modelled as time.sleep(10)
-            time.sleep(2)
-            data = cls.computational_section()
+            # computational section
+            gradients, local_T = cls.algorithm_loop_body(t, cls.t_max, weights)
 
             # PUSH section
-            cls.send_data("PUSH")
-            OK_received = False
-            while not OK_received:
-                fromServer = cls.socket.recv(10)
-                if fromServer == b'OK':
-                    print("OK(PUSH) received")
-                    OK_received = True
-                    bytes_to_send = encode_bytes(data)
-                    bytes_to_send_size = encode_bytes(str(len(bytes_to_send)))
-                    bytes_to_send_size = b'0' * (MAX_SIZE - len(bytes_to_send_size)) + bytes_to_send_size
-                    cls.socket.sendall(bytes_to_send_size)
-                    cls.send_data(data)
+
+            gradients_json = json.dumps(gradients)
+            data = "GRADIENTS" + gradients
+            cls.push_to_server(data)
+
+            local_T_str = str(local_T)
+            data = "local_T" + local_T_str
+            cls.push_to_server(data)
+
+    @classmethod
+    def push_to_server(cls, data_str):
+        cls.socket.sendall("PUSH")
+        OK_received = False
+        while not OK_received:
+            fromServer = cls.socket.recv(10)
+            if fromServer == b'OK':
+                print("OK(PUSH) received")
+                OK_received = True
+                bytes_to_send = encode_bytes(data_str)
+                bytes_to_send_size = encode_bytes(str(len(bytes_to_send)))
+                bytes_to_send_size = b'0' * (MAX_SIZE - len(bytes_to_send_size)) + bytes_to_send_size
+                cls.socket.sendall(bytes_to_send_size)
+                cls.socket.sendall(bytes_to_send)
+                print("data sent: %s" % data_str)
+
+    @classmethod
+    def pull_from_server(cls):
+        cls.socket.sendall("PULL")
+        OK_received = False
+        while not OK_received:
+            fromServer = bytes(cls.socket.recv(22))
+            if fromServer.startswith(b'OK'):
+                print("OK(PULL) received")
+                OK_received = True
+
+                content_length = fromServer.lstrip(b'OK')
+                print("content_length: %s" % content_length)
+                content_length_int = int(content_length)
+                data_received = cls.socket.recv(content_length_int)
+                print("data_received: %s, length: %s" % (data_received, len(data_received)))
 
     @classmethod
     def computational_section(cls):
@@ -91,13 +107,6 @@ class Agent():
     @staticmethod
     def generate_data():
         return json.dumps([random.randint(0, 10) for n in range(1)])
-
-    @classmethod
-    def send_data(cls, data):
-        cls.socket.sendall(encode_bytes(data))
-        print("Data sent: %s" % data)
-        # data = cls.socket.recv(1024)
-        # print('Received', repr(data))
 
     @classmethod
     def pull_weights(cls):
@@ -112,11 +121,11 @@ class Agent():
         pass
 
     @classmethod
-    def algorithm_loop_body(cls, t, t_max):
+    def algorithm_loop_body(cls, t, t_max, weights):
         local_T = 0
         t_start = t # TODO: initialize to 1
 
-        cls.network.update_weights(cls.pull_weights())
+        cls.network.update_weights(weights)
 
         states = {}
         rewards = {}
@@ -170,6 +179,4 @@ class Agent():
 
         gradients = cls.network.calc_gradients(states, actions, R)
 
-        cls.push_gradients(gradients)
-
-        cls.handle_T(local_T)
+        return gradients, local_T

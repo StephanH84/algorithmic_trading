@@ -7,14 +7,38 @@ from AT.q_trading.src.network import Network
 
 
 class DQN_Agent():
-    def __init__(self, env, alpha, gamma, theta, C, seq_size, N, beta):
+    def __init__(self, env, alpha, gamma, theta, C, seq_size, N, beta, T_max, activation):
         self.replay_memory = []
         self.history = []
         self.seq_size = seq_size
-        self.network = Network(env.state_is_terminal, self.seq_size, alpha, gamma, theta, C, beta)
+        self.network = Network(env.state_is_terminal, self.seq_size, alpha, gamma, theta, C, beta, activation)
         self.N = N # mini-batch size
         self.learn_time_random = []
 
+        self.T_max = T_max
+        self.frame_counter = 0
+
+    def get_annealling_eps(self):
+        u = random.uniform(0, 1)
+
+        eps = [0.1, 0.01, 0.4]
+
+        if 0 < u < 0.4:
+            i = 0
+        elif 0.4 < u < 0.75:
+            i = 1
+        else:
+            i = 2
+
+        k = - np.log(eps[i]) / self.T_max
+        T = self.frame_counter
+        eps = np.exp(-k*T)
+
+        self.frame_counter += 1
+
+        if self.frame_counter % 3 == 0:
+            print(eps)
+        return eps
 
     def turn(self, state, eps=0.05, dontExplore=False):
         def explore(self):
@@ -24,6 +48,7 @@ class DQN_Agent():
             a = self.exploit(explore, state)
         else:
             rnd = random.uniform(0, 1)
+            eps = self.get_annealling_eps()
             if rnd < eps:
                 # explore
                 a = explore(state)
@@ -47,9 +72,9 @@ class DQN_Agent():
         self.learn_special()
 
 
-    def update(self, reward, new_state):
+    def update(self, reward, new_state, no_subsample):
         self.store(self.action, reward, new_state)
-        self.learn()
+        self.learn(no_subsample)
 
     # Now the technical part interfacing to the learning part (network)
 
@@ -93,7 +118,7 @@ class DQN_Agent():
         date = new_state_[0]
         self.history.append([date, value])
 
-    def learn(self):
+    def learn(self, no_subsample):
         # provide minibatch
         replay_size = len(self.replay_memory)
         if replay_size >= self.seq_size:
@@ -107,7 +132,7 @@ class DQN_Agent():
 
             minibatch = [self.replay_memory[p] for p in index_list]
 
-            self.network.learn(minibatch)
+            self.network.learn(minibatch, no_subsample)
 
 
     def learn_special(self):
@@ -133,3 +158,4 @@ class DQN_Agent():
 
     def reset_history(self):
         self.history = []
+        self.replay_memory = []

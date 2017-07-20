@@ -54,6 +54,8 @@ class TradingEnv():
         self.EOG = False
 
     def intialize(self):
+        self.trading_history = []
+        self.action_history = []
         self.trading_stream_gen = self.trading_stream.get_next()
         while len(self.trading_history) < self.window_size:
             self.pull_next_state()
@@ -186,6 +188,8 @@ class RunEnv():
                     break
 
                 self.agent.update_special(actions, rewards, new_state)
+
+            self.agent.reset_history()
 
         # testing phase, i.e. no updates
         self.env.enable_test_phase()

@@ -14,10 +14,11 @@ class GlobalState():
     BEGINNING = 1
 
 class ParameterServer():
-    # The parameter server and spawning all other threads
-    def __init__(self, alpha, eta):
+    # The parameter server implementing a two-way many-client push-pull protocol and spawning all other threads
+    def __init__(self, alpha, eta, T_max):
         self.alpha = alpha
         self.eta = eta
+        self.T_max = T_max
         self.internal_state = GlobalState.BEGINNING
 
         self.weights_common = np.array()
@@ -43,6 +44,7 @@ class ParameterServer():
 
 
     def event_loop(self):
+        T = 0
         while True:
             for sock, conn, addr in self.procs:
                 time.sleep(0.3)
@@ -64,17 +66,33 @@ class ParameterServer():
 
                     if data is not None:
                         data_decode = decode_bytes(data)
+
+                        GRAD = "GRADIENTS"
+                        local_T = "local_T"
+                        if data_decode.startswith(GRAD):
+                            weights = json.loads(data_decode[len(GRAD):])
+                            self.update_weights(weights)
+                        elif data_decode.startswith(local_T):
+                            T += int(data_decode[len(local_T):])
+
                         self.data_storage.append([addr[1], data_decode])
 
                     conn.sendall(b'PUSH_END')
 
                 elif data == b'PULL':
                     print("PULL received")
-                    bytes_to_send = encode_bytes(json.dumps(self.data_storage))
+                    bytes_to_send = encode_bytes(json.dumps(self.get_weights()))
                     bytes_to_send_size = encode_bytes(str(len(bytes_to_send)))
                     bytes_to_send_size = b'0' * (MAX_SIZE - len(bytes_to_send_size)) + bytes_to_send_size
                     conn.sendall(b'OK' + bytes_to_send_size)
                     conn.sendall(bytes_to_send)
+
+            if T > self.T_max:
+                print("T ran to T_max...")
+                break
+
+    def get_weights(self):
+        return [self.weights_policy, self.weights_value, self.weights_common]
 
     def receive(self, conn, content_length_int):
         t0 = time.time()
