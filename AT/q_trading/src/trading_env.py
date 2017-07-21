@@ -54,6 +54,8 @@ class TradingEnv():
         self.EOG = False
 
     def intialize(self):
+        self.trading_history = []
+        self.action_history = []
         self.trading_stream_gen = self.trading_stream.get_next()
         while len(self.trading_history) < self.window_size:
             self.pull_next_state()
@@ -218,7 +220,7 @@ class RunEnv():
         self.env.plot_wealth()
 
 
-    def run(self, episodes, testing_phase, training_phase):
+    def run_new2(self, episodes, testing_phase, training_phase):
 
 
         for e in range(episodes):
@@ -242,6 +244,46 @@ class RunEnv():
                     break
 
                 self.agent.update(reward, new_state, no_subsample=True)
+
+        # testing phase, i.e. no updates
+        self.env.enable_test_phase()
+
+        for n in range(testing_phase):
+            action = self.agent.turn(self.env.trading_history[-1], dontExplore=True)
+
+            new_state, reward, EOG = self.env.act(action)
+
+            print("new_state: %s" % new_state)
+            if EOG:
+                break
+
+            self.agent.store(action, reward, new_state)
+
+        self.env.plot_wealth()
+
+
+    def run(self, episodes, testing_phase, training_phase):
+
+
+        for e in range(episodes):
+            self.env.intialize()
+            if e > 0:
+                pass # TODO something like self.env.reset_history()
+
+            # training phase
+            for n in range(training_phase):
+
+                actions, rewards, new_state, EOG = self.env.get_rewards()
+
+
+                if n % 2 == 0:
+                    print("Epsiode: %s, Day: %s" % (e, n))
+                    print("new_state: %s" % new_state)
+
+                if EOG:
+                    break
+
+                self.agent.update_special(actions, rewards, new_state)
 
         # testing phase, i.e. no updates
         self.env.enable_test_phase()

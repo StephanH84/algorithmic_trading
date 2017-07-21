@@ -1,4 +1,4 @@
-from trading_env import TradingEnv, TradingStream, RunEnv
+from AT.q_trading.src.trading_env import TradingEnv, TradingStream, RunEnv
 from dqn_agent import DQN_Agent
 
 def main():
@@ -10,18 +10,19 @@ def main():
     C = None
     seq_size = 200
     N = 64
-    beta = 0.1
+    buffer_size = int(1.6 * N)
+    beta = None # needs to anneal or is dysfunctional
     T_max = 1000
-    activation = "tanh"
+    activation = "RELU"
 
-    agent = DQN_Agent(tradingEnv, alpha, gamma, theta, C, seq_size, N, beta, T_max, activation)
+    agent = DQN_Agent(tradingEnv, alpha, gamma, theta, C, seq_size, N, beta, T_max, activation, buffer_size, noDDQN=True)
 
     runEnv = RunEnv(tradingEnv, agent)
 
     # officially
-    # runEnv.run(episodes=4, testing_phase=2750, training_phase=1460)
+    # runEnv.run(episodes=5, testing_phase=2750, training_phase=1564)
 
-    runEnv.run(episodes=2, testing_phase=2750, training_phase=1460)
+    runEnv.run(episodes=1, testing_phase=2750, training_phase=1564)
 
     # runEnv.run(episodes=1, testing_phase=1500, training_phase=2500)
 

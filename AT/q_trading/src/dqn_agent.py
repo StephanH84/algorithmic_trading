@@ -7,13 +7,14 @@ from AT.q_trading.src.network import Network
 
 
 class DQN_Agent():
-    def __init__(self, env, alpha, gamma, theta, C, seq_size, N, beta, T_max, activation):
+    def __init__(self, env, alpha, gamma, theta, C, seq_size, N, beta, T_max, activation, buffer_size, noDDQN):
         self.replay_memory = []
         self.history = []
         self.seq_size = seq_size
-        self.network = Network(env.state_is_terminal, self.seq_size, alpha, gamma, theta, C, beta, activation)
+        self.network = Network(env.state_is_terminal, self.seq_size, alpha, gamma, theta, C, beta, activation, noDDQN)
         self.N = N # mini-batch size
         self.learn_time_random = []
+        self.buffer_size = buffer_size
 
         self.T_max = T_max
         self.frame_counter = 0
@@ -97,6 +98,7 @@ class DQN_Agent():
 
         if len(phi) == self.seq_size and len(new_phi) == self.seq_size:
             self.replay_memory.append([phi, action, reward, new_phi])
+            self.replay_memory = self.replay_memory[-self.buffer_size:]
 
         new_state_ = new_state.copy()
         previous_state = self.history[-1] if len(self.history) > 0 else [None, new_state_[1]]
@@ -111,6 +113,7 @@ class DQN_Agent():
 
         if len(phi) == self.seq_size and len(new_phi) == self.seq_size:
             self.replay_memory.append([phi, actions, rewards, new_phi])
+            self.replay_memory = self.replay_memory[-self.buffer_size:]
 
         new_state_ = new_state.copy()
         previous_state = self.history[-1] if len(self.history) > 0 else [None, new_state_[1]]
@@ -121,11 +124,13 @@ class DQN_Agent():
     def learn(self, no_subsample):
         # provide minibatch
         replay_size = len(self.replay_memory)
-        if replay_size >= self.seq_size:
+        if replay_size >= self.N * 1.5:
             index_list = []
             t0 = time.time()
-            for n in range(self.N):
-                index_list.append(random.randint(0, replay_size-1))
+            while len(index_list) < self.N: # the loop terminates because of the above condition, also in a sufficient small time due to the factor 2
+                index = random.randint(0, replay_size - 1)
+                if index not in index_list:
+                    index_list.append(index)
             t1 = time.time()
             self.learn_time_random.append(t1 - t0)
             index_list = list(set(index_list))

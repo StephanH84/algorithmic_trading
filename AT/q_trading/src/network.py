@@ -6,11 +6,11 @@ import numpy as np
 import time
 
 def weight_variable(shape):
-  initial = tf.truncated_normal(shape, stddev=0.1)
+  initial = tf.truncated_normal(shape, stddev=0.01)
   return tf.Variable(initial)
 
 def bias_variable(shape):
-  initial = tf.constant(0.1, shape=shape)
+  initial = tf.constant(0.05, shape=shape)
   return tf.Variable(initial)
 
 def conv2d(x, W):
@@ -25,7 +25,7 @@ def actions_to_matrix(action):
     return matrix
 
 class Network():
-    def __init__(self, state_is_terminal, step_size, alpha, gamma, theta, C, beta, activation):
+    def __init__(self, state_is_terminal, step_size, alpha, gamma, theta, C, beta, activation, noDDQN):
         self.state_is_terminal = state_is_terminal
         self.alpha = alpha
         self.beta = beta
@@ -34,6 +34,7 @@ class Network():
         self.C = C
         self.seq_size = step_size
         self.keep_prob_value = 0.95
+        self.noDDQN = noDDQN
 
 
         self.time_save_weights = []
@@ -71,7 +72,7 @@ class Network():
         self.phase = tf.placeholder(tf.bool)
 
         # Define network
-        self.output = self.define_network_cnn_bn(self.phi, self.phase, activation)
+        self.output = self.define_fft_network(self.phi, self.phase, activation)
 
         output_evaluated = tf.reduce_sum(self.output * self.actions, axis=[1])
         self.loss = tf.reduce_sum(tf.squared_difference(self.y, output_evaluated))
@@ -154,6 +155,111 @@ class Network():
 
         self.params = [self.W_conv1, self.b_conv1, self.W_conv2, self.b_conv2, self.W_conv3, self.b_conv3]
         self.params.extend([self.Wfcn, self.bfcn])
+
+        return output
+
+
+    def make_layer_simple(self, input, size, activation):
+
+        W = weight_variable([int(input.shape[1]), size])
+        b = bias_variable([size])
+        o3 = tf.matmul(input, W) + b
+
+        h_conv = activation(o3)
+
+        output = h_conv
+
+        return output, W, b
+
+    def define_fft_network(self, input, phase, activation):
+        assert input.shape[1] == 329
+
+        # divide in 5 time-intervals:
+        input_sliced = [input[:,n*59:n*59 + 64] for n in range(5)]
+
+        input_sliced_fft = [self.get_fft_features(i_slice) for i_slice in input_sliced] # (5x2)xT[Nx64]
+
+        W_conv1 = weight_variable([4, 1, 32])
+        b_conv1 = bias_variable([64, 32])
+
+        W_conv2 = weight_variable([4, 32, 64])
+        b_conv2 = bias_variable([64, 64])
+
+        cnn_fft = [self.do_conv_2(item, W_conv1, b_conv1, W_conv2, b_conv2, tf.nn.relu) for item in slice for slice in input_sliced_fft]
+        # TODO: Same weights for amplitudes and phases?
+
+        abs_features_sliced = [self.get_abs_features(i_slice) for i_slice in input_sliced]  # (5x2)xT[Nx64]
+
+        rnn_input_ = [[input_sliced_fft[n], abs_features_sliced[n]] for n in range(5)]
+        rnn_input = rnn_input_ # needs to have the shape: [None, 5, size of input_sliced_fft[n] + size of abs_features_sliced[n]]
+
+        num_hidden = 32 # TODO: experiment
+        rnn_cell = tf.nn.rnn_cell.LSTMCell(num_hidden, state_is_tuple=True)
+
+        rnn_output, state = tf.nn.dynamic_rnn(rnn_cell, rnn_input, dtype=tf.float32)
+
+        rnn_output_reshaped = rnn_output
+
+        output, Wfcn, bfcn = self.make_layer_simple(rnn_output_reshaped, 3, tf.nn.relu)
+
+        return output
+
+    def get_abs_features(self, input):
+        # input: Nx64
+        # max
+        input_max = tf.reduce_max(input, axis=[1])
+        # min
+        input_min = tf.reduce_min(input, axis=[1])
+        # mean
+        input_mean = tf.reduce_mean(input, axis=[1])
+        # regression slope
+        slope = self.calc_slope(tf.constant(list(range(64))), input)
+
+
+        return input_max, input_min, input_mean, slope
+
+    def calc_slope(self, x, y):
+        x_mean = tf.reduce_mean(x, axis=[1])
+        y_mean = tf.reduce_mean(y, axis=[1])
+
+        cov = tf.reduce_mean((x - x_mean) * (y - y_mean), axis=[1])
+        var = tf.reduce_mean((x - x_mean) ** 2, axis=[1])
+
+        return cov / var
+
+    def do_conv_2(self, input, W_conv1, b_conv1, W_conv2, b_conv2, activation):
+        conv1 = conv1d(input, W_conv1) + b_conv1
+        hidden1 = activation(conv1)
+
+        conv2 = conv1d(hidden1, W_conv2) + b_conv2
+        hidden2 = activation(conv2)
+        return hidden2
+
+    def get_fft_features(self, input):
+        # TODO: Work on the details
+
+        input_fft = tf.fft(input)
+
+        fft_ampl = tf.abs(input_fft)
+        fft_phase = tf.atan2(tf.imag(input_fft), tf.real(input_fft))
+
+        return fft_ampl, fft_phase
+
+    def define_network_simple(self, phi, phase, activation):
+        # Try a CNN
+        input = phi # tf.reshape(phi, [-1, self.seq_size, 1])
+
+        self.output0 = input
+
+        self.output1, self.W_1, self.b_1 = self.make_layer_simple(self.output0, 100, activation)
+
+        self.output2, self.W_2, self.b_2 = self.make_layer_simple(self.output1, 50, activation)
+
+        self.output3, self.W_3, self.b_3 = self.make_layer_simple(self.output1, 3, activation)
+
+        output = tf.nn.softmax(self.output3)
+
+        self.params = [self.W_1, self.b_1, self.W_2, self.b_2, self.W_3, self.b_3]
 
         return output
 
@@ -370,6 +476,9 @@ class Network():
             self.slide_weights()
 
     def calculate_y(self, sample, DDQN=True):
+        if self.noDDQN is not None:
+            DDQN = not self.noDDQN
+
         if DDQN:
             return self.calculate_y_DDQN(sample)
 
