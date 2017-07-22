@@ -54,8 +54,10 @@ class Network():
 
 
     def __del__(self):
-        if self.sess is not None:
+        try:
             self.sess.close()
+        except:
+            pass
 
     def initialize(self, activation):
         self.round_counter = 0
@@ -185,50 +187,71 @@ class Network():
         W_conv2 = weight_variable([4, 32, 64])
         b_conv2 = bias_variable([64, 64])
 
-        cnn_fft = [self.do_conv_2(item, W_conv1, b_conv1, W_conv2, b_conv2, tf.nn.relu) for item in slice for slice in input_sliced_fft]
-        # TODO: Same weights for amplitudes and phases?
+        # each item is a tensor of shape Nx64
+        cnn_fft = []
+        for slice in input_sliced_fft:
+            slice_conv = [self.do_conv_2(item, W_conv1, b_conv1, W_conv2, b_conv2, tf.nn.relu) for item in slice]
+            # TODO: Same weights for amplitudes and phases?
+            slice_conv_concat = tf.concat(slice_conv, axis=2)
+            slice_conv_concat = tf.reshape(slice_conv_concat, shape=[-1, 64 * 2*64])
+            cnn_fft.append(slice_conv_concat)
 
-        abs_features_sliced = [self.get_abs_features(i_slice) for i_slice in input_sliced]  # (5x2)xT[Nx64]
+        abs_features_sliced = []
+        for i_slice in input_sliced:
+            abs_feature = self.get_abs_features(i_slice)
+            abs_features_sliced.append(abs_feature)
 
-        rnn_input_ = [[input_sliced_fft[n], abs_features_sliced[n]] for n in range(5)]
-        rnn_input = rnn_input_ # needs to have the shape: [None, 5, size of input_sliced_fft[n] + size of abs_features_sliced[n]]
+        rnn_input_ = []
+        for n in range(5):
+            feature_ = tf.concat([cnn_fft[n], abs_features_sliced[n]], axis=1)
+            feature_ = tf.reshape(feature_, shape=[-1, 1, int(feature_.shape[1])])
+            rnn_input_.append(feature_)
+
+        rnn_input = tf.concat(rnn_input_, axis=1) # needs to have the shape: [None, 5, size of input_sliced_fft[n] + size of abs_features_sliced[n]]
 
         num_hidden = 32 # TODO: experiment
         rnn_cell = tf.nn.rnn_cell.LSTMCell(num_hidden, state_is_tuple=True)
+        rnn_weights = rnn_cell.trainable_weights
 
         rnn_output, state = tf.nn.dynamic_rnn(rnn_cell, rnn_input, dtype=tf.float32)
 
-        rnn_output_reshaped = rnn_output
+        rnn_output_reshaped = tf.reshape(rnn_output, shape=[-1, int(rnn_output.shape[1]) * int(rnn_output.shape[2])])
 
         output, Wfcn, bfcn = self.make_layer_simple(rnn_output_reshaped, 3, tf.nn.relu)
+
+        self.params = [W_conv1, b_conv1, W_conv2, b_conv2, Wfcn, bfcn] + rnn_weights
 
         return output
 
     def get_abs_features(self, input):
         # input: Nx64
         # max
-        input_max = tf.reduce_max(input, axis=[1])
+        input_max = tf.reshape(tf.reduce_max(input, axis=[1]), shape=[-1, 1])
         # min
-        input_min = tf.reduce_min(input, axis=[1])
+        input_min = tf.reshape(tf.reduce_min(input, axis=[1]), shape=[-1, 1])
         # mean
-        input_mean = tf.reduce_mean(input, axis=[1])
+        input_mean = tf.reshape(tf.reduce_mean(input, axis=[1]), shape=[-1, 1])
         # regression slope
-        slope = self.calc_slope(tf.constant(list(range(64))), input)
+        slope = tf.reshape(self.calc_slope(input), shape=[-1, 1])
 
 
-        return input_max, input_min, input_mean, slope
+        return tf.concat([input_max, input_min, input_mean, slope], axis=1)
 
-    def calc_slope(self, x, y):
-        x_mean = tf.reduce_mean(x, axis=[1])
-        y_mean = tf.reduce_mean(y, axis=[1])
+    def calc_slope(self, y):
+        time_ = np.asarray([float(n) for n in range(64)])
+        time_mean = np.mean(time_)
+        y_mean = tf.reshape(tf.reduce_mean(y, axis=[1]), shape=[-1, 1])
 
-        cov = tf.reduce_mean((x - x_mean) * (y - y_mean), axis=[1])
-        var = tf.reduce_mean((x - x_mean) ** 2, axis=[1])
+        cov = tf.reduce_mean((time_ - time_mean) * (y - y_mean), axis=[1])
+        var = tf.cast(tf.reduce_mean((time_ - time_mean) ** 2), tf.float32)
 
         return cov / var
 
     def do_conv_2(self, input, W_conv1, b_conv1, W_conv2, b_conv2, activation):
-        conv1 = conv1d(input, W_conv1) + b_conv1
+        # input has shape Nx64 and must be reshaped to Nx1x64
+        input_ = tf.reshape(input, [-1, int(input.shape[1]), 1])
+
+        conv1 = conv1d(input_, W_conv1) + b_conv1
         hidden1 = activation(conv1)
 
         conv2 = conv1d(hidden1, W_conv2) + b_conv2
@@ -238,7 +261,9 @@ class Network():
     def get_fft_features(self, input):
         # TODO: Work on the details
 
-        input_fft = tf.fft(input)
+        input_ = tf.cast(input, tf.complex64)
+
+        input_fft = tf.fft(input_)
 
         fft_ampl = tf.abs(input_fft)
         fft_phase = tf.atan2(tf.imag(input_fft), tf.real(input_fft))

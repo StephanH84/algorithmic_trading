@@ -8,7 +8,7 @@ def main():
     gamma = 0.85
     theta = 3*1e-4
     C = None
-    seq_size = 200
+    seq_size = 329 #200
     N = 64
     buffer_size = int(1.6 * N)
     beta = None # needs to anneal or is dysfunctional
