@@ -1,0 +1,1 @@
+This code follows the paper "Deep Direct Reinforcement Learning for Financial Signal Representation and Trading"
