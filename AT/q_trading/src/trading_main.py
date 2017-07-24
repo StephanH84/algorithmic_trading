@@ -8,10 +8,10 @@ def main():
     gamma = 0.85
     theta = 3*1e-4
     C = None
-    seq_size = 329 #200
+    seq_size = 64 + (4-1) * (64-5) #200
     N = 64
     buffer_size = int(1.6 * N)
-    beta = None # needs to anneal or is dysfunctional
+    beta = 0.01 # needs to anneal or is dysfunctional
     T_max = 1000
     activation = "RELU"
 

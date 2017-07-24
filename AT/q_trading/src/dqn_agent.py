@@ -68,8 +68,8 @@ class DQN_Agent():
             a = np.argmax(np.asarray(action_value)) - 1
         return a
 
-    def update_special(self, actions, rewards, new_state):
-        self.store_special(actions, rewards, new_state)
+    def update_special(self, actions, rewards, new_state, deltaPrices=True):
+        self.store_special(actions, rewards, new_state, deltaPrices)
         self.learn_special()
 
 
@@ -107,7 +107,7 @@ class DQN_Agent():
         self.history.append([date, value])
 
 
-    def store_special(self, actions, rewards, new_state):
+    def store_special(self, actions, rewards, new_state, deltaPrices=True):
         phi = self.history[-self.seq_size:]
         new_phi = (self.history + [new_state])[-self.seq_size:]
 
@@ -116,8 +116,11 @@ class DQN_Agent():
             self.replay_memory = self.replay_memory[-self.buffer_size:]
 
         new_state_ = new_state.copy()
-        previous_state = self.history[-1] if len(self.history) > 0 else [None, new_state_[1]]
-        value = new_state_[1] - previous_state[1] # Take delta price
+        if deltaPrices:
+            previous_state = self.history[-1] if len(self.history) > 0 else [None, new_state_[1]]
+            value = new_state_[1] - previous_state[1] # Take delta price
+        else:
+            value = new_state_[1]
         date = new_state_[0]
         self.history.append([date, value])
 

@@ -272,6 +272,9 @@ class RunEnv():
 
             # training phase
             for n in range(training_phase):
+                if n % 2 == 0:
+                    # for evaluation during trainings
+                    action = self.agent.turn(self.env.trading_history[-1], dontExplore=True)
 
                 actions, rewards, new_state, EOG = self.env.get_rewards()
 
@@ -283,7 +286,7 @@ class RunEnv():
                 if EOG:
                     break
 
-                self.agent.update_special(actions, rewards, new_state)
+                self.agent.update_special(actions, rewards, new_state, deltaPrices=False)
 
         # testing phase, i.e. no updates
         self.env.enable_test_phase()
@@ -297,6 +300,6 @@ class RunEnv():
             if EOG:
                 break
 
-            self.agent.store(action, reward, new_state)
+            self.agent.store(action, reward, new_state) # TODO: Check it this is really needed
 
         self.env.plot_wealth()

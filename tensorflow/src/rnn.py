@@ -3,7 +3,7 @@ import tensorflow as tf
 import numpy as np
 from random import shuffle
 
-train_input = ['{0:020b}'.format(i) for i in range(2 ** 19)]
+train_input = ['{0:020b}'.format(i) for i in range(2 ** 18)]
 shuffle(train_input)
 train_input = [map(int, i) for i in train_input]
 ti = []
@@ -63,7 +63,7 @@ sess.run(init_op)
 
 batch_size = 1000
 no_of_batches = int(len(train_input)/batch_size)
-epoch = 5# 000
+epoch = 10 # 5000
 for i in range(epoch):
     ptr = 0
     for j in range(no_of_batches):
@@ -74,9 +74,13 @@ for i in range(epoch):
 incorrect = sess.run(error,{data: test_input, target: test_output})
 print('Epoch {:2d} error {:3.1f}%'.format(i + 1, 100 * incorrect))
 
-state_evaluated = sess.run(state, {data: test_input, target: test_output})
+
 val_evaluated = sess.run(val, {data: test_input, target: test_output})
-last_evaluated = sess.run(last, {data: test_input, target: test_output})
+
+trainable_weights = sess.run(cell.trainable_weights, {data: test_input, target: test_output})
+trainable_variables = sess.run(cell.trainable_variables, {data: test_input, target: test_output})
+non_trainable_weights = sess.run(cell.non_trainable_weights, {data: test_input, target: test_output})
+non_trainable_variables = sess.run(cell.non_trainable_variables, {data: test_input, target: test_output})
 
 sess.close()
 
